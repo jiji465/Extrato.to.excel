@@ -1,0 +1,14 @@
+# Blueprint do Render — implanta o app COMPLETO (com OCR).
+# No painel do Render: New > Blueprint > conecte o repositório do GitHub.
+services:
+  - type: web
+    name: extrato-conversor
+    runtime: python
+    plan: free                       # suba para 'starter' se faltar memória no OCR
+    buildCommand: pip install -r requirements-ocr.txt
+    startCommand: gunicorn app:app --workers 2 --timeout 120
+    envVars:
+      - key: EXTRATO_SECRET
+        generateValue: true          # chave de sessão gerada automaticamente
+      - key: EXTRATO_SENHA
+        sync: false                  # defina no painel se quiser exigir senha

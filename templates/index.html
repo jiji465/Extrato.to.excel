@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Extrato PDF → Excel</title>
+  <style>
+    :root { --roxo:#4F46E5; --roxo2:#6366F1; --cinza:#6b7280; --borda:#e5e7eb; --ok:#16a34a; --erro:#dc2626; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+           margin:0; background:#f5f6fa; color:#111827; }
+    .wrap { max-width:760px; margin:0 auto; padding:40px 20px; }
+    h1 { font-size:1.6rem; margin:0 0 4px; }
+    p.sub { color:var(--cinza); margin:0 0 28px; }
+    #drop { border:2px dashed #c7cbe0; border-radius:16px; background:#fff;
+            padding:48px 20px; text-align:center; cursor:pointer; transition:.15s; }
+    #drop.hover { border-color:var(--roxo); background:#f0f1ff; }
+    #drop .big { font-size:2.4rem; }
+    #drop .txt { margin-top:10px; font-weight:600; }
+    #drop .hint { color:var(--cinza); font-size:.9rem; margin-top:4px; }
+    #lista { margin:18px 0; padding:0; list-style:none; }
+    #lista li { background:#fff; border:1px solid var(--borda); border-radius:10px;
+                padding:10px 14px; margin-bottom:8px; display:flex; justify-content:space-between; gap:10px; }
+    .btn { background:var(--roxo); color:#fff; border:0; border-radius:10px;
+           padding:14px 22px; font-size:1rem; font-weight:600; cursor:pointer; width:100%; }
+    .btn:disabled { background:#c7cbe0; cursor:not-allowed; }
+    .btn:hover:not(:disabled) { background:var(--roxo2); }
+    table { width:100%; border-collapse:collapse; margin-top:22px; background:#fff;
+            border-radius:10px; overflow:hidden; }
+    th,td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--borda); font-size:.92rem; }
+    th { background:#f3f4f6; }
+    .ok { color:var(--ok); font-weight:600; }
+    .erro { color:var(--erro); font-weight:600; }
+    .aviso { color:#b45309; font-weight:600; }
+    .det { color:var(--cinza); font-size:.82rem; margin-top:4px; white-space:pre-line; }
+    .oculto { display:none; }
+    #status { margin-top:14px; font-size:.95rem; color:var(--cinza); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Extrato PDF → Excel</h1>
+    <p class="sub">Arraste extratos em PDF de qualquer banco. Geramos uma planilha única e padronizada.</p>
+
+    <div id="drop">
+      <div class="big">📄→📊</div>
+      <div class="txt">Arraste os PDFs aqui ou clique para escolher</div>
+      <div class="hint">Vários bancos e vários arquivos de uma vez</div>
+      <input id="file" type="file" accept="application/pdf" multiple class="oculto">
+    </div>
+
+    <ul id="lista"></ul>
+
+    <button id="enviar" class="btn" disabled>Converter para Excel</button>
+    <div id="status"></div>
+
+    <table id="relatorio" class="oculto">
+      <thead><tr><th>Arquivo</th><th>Banco</th><th>Tipo</th><th>Transações</th><th>Auditoria de saldos</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    const drop = document.getElementById('drop');
+    const input = document.getElementById('file');
+    const lista = document.getElementById('lista');
+    const btn = document.getElementById('enviar');
+    const status = document.getElementById('status');
+    const tabela = document.getElementById('relatorio');
+    let arquivos = [];
+
+    function render() {
+      lista.innerHTML = '';
+      arquivos.forEach((f, i) => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>📄 ${f.name}</span><span>${(f.size/1024).toFixed(0)} KB</span>`;
+        lista.appendChild(li);
+      });
+      btn.disabled = arquivos.length === 0;
+    }
+
+    function add(files) {
+      for (const f of files) {
+        if (f.name.toLowerCase().endsWith('.pdf')) arquivos.push(f);
+      }
+      render();
+    }
+
+    drop.addEventListener('click', () => input.click());
+    input.addEventListener('change', e => add(e.target.files));
+    ['dragenter','dragover'].forEach(ev =>
+      drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('hover'); }));
+    ['dragleave','drop'].forEach(ev =>
+      drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('hover'); }));
+    drop.addEventListener('drop', e => add(e.dataTransfer.files));
+
+    btn.addEventListener('click', async () => {
+      if (!arquivos.length) return;
+      btn.disabled = true;
+      status.textContent = 'Processando…';
+      tabela.classList.add('oculto');
+
+      const fd = new FormData();
+      arquivos.forEach(f => fd.append('arquivos', f));
+
+      try {
+        const resp = await fetch('/converter', { method:'POST', body:fd });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.erro || 'Falha na conversão.');
+
+        // baixa o Excel
+        const bytes = Uint8Array.from(atob(data.arquivo_b64), c => c.charCodeAt(0));
+        const blob = new Blob([bytes], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = data.nome; a.click();
+        URL.revokeObjectURL(url);
+
+        // mostra relatório
+        const tbody = tabela.querySelector('tbody');
+        tbody.innerHTML = '';
+        let total = 0, alertas = 0;
+        data.relatorio.forEach(r => {
+          total += r.transacoes;
+          const tr = document.createElement('tr');
+          let st;
+          if (r.erro) {
+            st = `<span class="erro">Erro: ${r.erro}</span>`;
+            alertas++;
+          } else {
+            const a = r.auditoria || {};
+            const cls = !a.conferido ? 'aviso' : (a.ok ? 'ok' : 'erro');
+            const icone = !a.conferido ? '⚠️' : (a.ok ? '✅' : '❌');
+            if (a.conferido && !a.ok) alertas++;
+            const det = (a.mensagens || []).join('\n');
+            const cats = Object.entries(r.categorias || {})
+              .sort((x, y) => y[1] - x[1])
+              .map(([nome, n]) => `${nome} (${n})`).join(' · ');
+            st = `<span class="${cls}">${icone} ${a.resumo || '—'}</span>` +
+                 (det ? `<div class="det">${det}</div>` : '') +
+                 (cats ? `<div class="det">🏷️ ${cats}</div>` : '');
+          }
+          const tipo = r.erro ? '—' : (r.tipo || '—');
+          tr.innerHTML = `<td>${r.nome}</td><td>${r.banco}</td><td>${tipo}</td><td>${r.transacoes}</td><td>${st}</td>`;
+          tbody.appendChild(tr);
+        });
+        tabela.classList.remove('oculto');
+        const aviso = alertas
+          ? ` ⚠️ ${alertas} arquivo(s) com divergência/erro — confira a coluna Auditoria.`
+          : ' ✅ Todos os saldos conferem.';
+        status.textContent = `Pronto! ${total} transações em ${data.relatorio.length} arquivo(s). O Excel foi baixado.` + aviso;
+      } catch (err) {
+        status.innerHTML = `<span class="erro">${err.message}</span>`;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

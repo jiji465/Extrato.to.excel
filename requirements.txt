@@ -1,0 +1,8 @@
+# Dependências principais (funcionam no Vercel — PDFs digitais).
+pdfplumber>=0.11.0
+openpyxl>=3.1.0
+Flask>=3.0.0
+gunicorn>=21.0.0      # servidor de produção (Render/Railway); o Vercel não usa
+
+# OCR (PDFs escaneados) e testes ficam em requirements-ocr.txt — instalados
+# localmente e no Render, mas NÃO no Vercel (excedem o limite de tamanho).

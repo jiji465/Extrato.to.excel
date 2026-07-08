@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Saídas / temporários
+*.xlsx
+*.tmp
+
+# Deploy
+.vercel/
+
+# PDFs de exemplo (dados sensíveis — nunca versionar)
+tests/fixtures/*.pdf
+*.pdf
