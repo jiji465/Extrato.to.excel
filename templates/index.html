@@ -3,157 +3,340 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Extrato PDF → Excel</title>
+  <title>Conversor de Extratos</title>
   <style>
-    :root { --roxo:#4F46E5; --roxo2:#6366F1; --cinza:#6b7280; --borda:#e5e7eb; --ok:#16a34a; --erro:#dc2626; }
-    * { box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-           margin:0; background:#f5f6fa; color:#111827; }
-    .wrap { max-width:760px; margin:0 auto; padding:40px 20px; }
-    h1 { font-size:1.6rem; margin:0 0 4px; }
-    p.sub { color:var(--cinza); margin:0 0 28px; }
-    #drop { border:2px dashed #c7cbe0; border-radius:16px; background:#fff;
-            padding:48px 20px; text-align:center; cursor:pointer; transition:.15s; }
-    #drop.hover { border-color:var(--roxo); background:#f0f1ff; }
-    #drop .big { font-size:2.4rem; }
-    #drop .txt { margin-top:10px; font-weight:600; }
-    #drop .hint { color:var(--cinza); font-size:.9rem; margin-top:4px; }
-    #lista { margin:18px 0; padding:0; list-style:none; }
-    #lista li { background:#fff; border:1px solid var(--borda); border-radius:10px;
-                padding:10px 14px; margin-bottom:8px; display:flex; justify-content:space-between; gap:10px; }
-    .btn { background:var(--roxo); color:#fff; border:0; border-radius:10px;
-           padding:14px 22px; font-size:1rem; font-weight:600; cursor:pointer; width:100%; }
-    .btn:disabled { background:#c7cbe0; cursor:not-allowed; }
-    .btn:hover:not(:disabled) { background:var(--roxo2); }
-    table { width:100%; border-collapse:collapse; margin-top:22px; background:#fff;
-            border-radius:10px; overflow:hidden; }
-    th,td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--borda); font-size:.92rem; }
-    th { background:#f3f4f6; }
-    .ok { color:var(--ok); font-weight:600; }
-    .erro { color:var(--erro); font-weight:600; }
-    .aviso { color:#b45309; font-weight:600; }
-    .det { color:var(--cinza); font-size:.82rem; margin-top:4px; white-space:pre-line; }
-    .oculto { display:none; }
-    #status { margin-top:14px; font-size:.95rem; color:var(--cinza); }
+    :root{
+      --petroleo:#0f766e; --petroleo2:#115e59; --petroleo-claro:#ccfbf1;
+      --texto:#0f172a; --sec:#475569; --borda:#e2e8f0; --fundo:#f1f5f9;
+      --ok:#16a34a; --ok-bg:#dcfce7; --ok-tx:#166534;
+      --aviso:#b45309; --aviso-bg:#fef3c7; --aviso-tx:#92400e;
+      --erro:#dc2626; --erro-bg:#fee2e2; --erro-tx:#991b1b;
+      --sombra:0 1px 3px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
+    }
+    *{box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+         margin:0;background:var(--fundo);color:var(--texto)}
+    a{color:inherit}
+
+    /* Barra de topo */
+    .topo{background:var(--petroleo);color:#fff}
+    .topo .in{max-width:860px;margin:0 auto;padding:14px 20px;
+              display:flex;align-items:center;justify-content:space-between}
+    .topo .marca{font-weight:700;font-size:1.05rem;display:flex;align-items:center;gap:8px}
+    .topo a.sair{color:#d1fae5;text-decoration:none;font-size:.9rem;font-weight:600;
+                 border:1px solid rgba(255,255,255,.35);padding:6px 12px;border-radius:8px}
+    .topo a.sair:hover{background:rgba(255,255,255,.12)}
+
+    .wrap{max-width:860px;margin:0 auto;padding:28px 20px 60px}
+    .lead{color:var(--sec);margin:0 0 22px;font-size:.98rem}
+
+    /* Área de soltar */
+    #drop{border:2px dashed #99c7c2;border-radius:14px;background:#fff;
+          padding:44px 20px;text-align:center;cursor:pointer;transition:.15s;box-shadow:var(--sombra)}
+    #drop:hover{border-color:var(--petroleo)}
+    #drop.hover{border-color:var(--petroleo);background:var(--petroleo-claro)}
+    #drop .big{font-size:2.2rem}
+    #drop .txt{margin-top:10px;font-weight:700}
+    #drop .hint{color:var(--sec);font-size:.88rem;margin-top:4px}
+
+    /* Lista de arquivos */
+    .lista-cab{display:flex;justify-content:space-between;align-items:center;
+               margin:20px 2px 8px;font-size:.9rem;color:var(--sec)}
+    .link{background:none;border:0;color:var(--petroleo);font-weight:600;
+          cursor:pointer;font-size:.88rem;padding:4px}
+    .link:hover{text-decoration:underline}
+    #lista{margin:0;padding:0;list-style:none}
+    #lista li{background:#fff;border:1px solid var(--borda);border-radius:10px;
+              padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;
+              gap:12px;box-shadow:var(--sombra)}
+    #lista .nome{flex:1;font-size:.92rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    #lista .tam{color:var(--sec);font-size:.82rem;white-space:nowrap}
+    #lista .rem{background:none;border:0;color:#94a3b8;cursor:pointer;font-size:1.1rem;
+                line-height:1;padding:2px 6px;border-radius:6px}
+    #lista .rem:hover{background:var(--erro-bg);color:var(--erro)}
+
+    /* Botão principal */
+    .btn{background:var(--petroleo);color:#fff;border:0;border-radius:10px;
+         padding:14px 22px;font-size:1rem;font-weight:700;cursor:pointer;width:100%;
+         margin-top:16px;transition:.15s}
+    .btn:disabled{background:#cbd5e1;cursor:not-allowed}
+    .btn:hover:not(:disabled){background:var(--petroleo2)}
+    .btn.sec{background:#fff;color:var(--petroleo);border:1px solid var(--petroleo)}
+    .btn.sec:hover{background:var(--petroleo-claro)}
+
+    /* Progresso */
+    #progresso{margin-top:18px;display:none}
+    .barra{height:8px;background:var(--borda);border-radius:999px;overflow:hidden}
+    .barra .fill{height:100%;width:38%;background:var(--petroleo);border-radius:999px;
+                 animation:desliza 1.15s infinite ease-in-out}
+    @keyframes desliza{0%{margin-left:-38%}100%{margin-left:100%}}
+    #progresso .msg{margin-top:8px;color:var(--sec);font-size:.9rem}
+
+    /* Cartões-resumo */
+    .resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+            gap:12px;margin-top:24px}
+    .kpi{background:#fff;border:1px solid var(--borda);border-radius:12px;
+         padding:16px;box-shadow:var(--sombra)}
+    .kpi .num{font-size:1.6rem;font-weight:800;color:var(--petroleo);line-height:1.1}
+    .kpi .lab{color:var(--sec);font-size:.82rem;margin-top:4px}
+    .kpi.alerta .num{color:var(--erro)}
+
+    /* Resultados por arquivo */
+    .sec-titulo{font-size:.85rem;font-weight:700;color:var(--sec);text-transform:uppercase;
+                letter-spacing:.04em;margin:26px 2px 10px}
+    .cardfile{background:#fff;border:1px solid var(--borda);border-radius:12px;
+              padding:14px 16px;margin-bottom:10px;box-shadow:var(--sombra)}
+    .cardfile .top{display:flex;align-items:center;gap:10px;justify-content:space-between}
+    .cardfile .nome{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .cardfile .meta{color:var(--sec);font-size:.86rem;margin-top:4px}
+    .selo{display:inline-block;background:var(--petroleo-claro);color:var(--petroleo2);
+          font-size:.74rem;font-weight:700;padding:2px 8px;border-radius:6px;margin-left:6px}
+    .pill{font-size:.78rem;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap}
+    .pill.ok{background:var(--ok-bg);color:var(--ok-tx)}
+    .pill.warn{background:var(--aviso-bg);color:var(--aviso-tx)}
+    .pill.err{background:var(--erro-bg);color:var(--erro-tx)}
+    .chips{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px}
+    .chip{background:var(--fundo);border:1px solid var(--borda);color:#334155;
+          border-radius:999px;padding:3px 10px;font-size:.76rem}
+    .det{margin-top:10px;color:var(--sec);font-size:.82rem;white-space:pre-line;
+         border-top:1px dashed var(--borda);padding-top:8px}
+
+    /* Histórico */
+    .hist{background:#fff;border:1px solid var(--borda);border-radius:10px;
+          padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;
+          gap:12px;justify-content:space-between;box-shadow:var(--sombra)}
+    .hist .info{font-size:.88rem}
+    .hist .info small{color:var(--sec)}
+    .hist button{background:none;border:1px solid var(--petroleo);color:var(--petroleo);
+                 border-radius:8px;padding:6px 12px;font-weight:600;cursor:pointer;font-size:.82rem}
+    .hist button:hover{background:var(--petroleo-claro)}
+
+    .erro-box{background:var(--erro-bg);color:var(--erro-tx);border:1px solid #fecaca;
+              border-radius:10px;padding:12px 14px;margin-top:16px;font-size:.9rem;display:none}
+    .oculto{display:none}
+    .acoes{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+    .acoes .btn{margin-top:0;flex:1;min-width:180px}
   </style>
 </head>
 <body>
+  <header class="topo">
+    <div class="in">
+      <div class="marca">📊 Conversor de Extratos</div>
+      {% if protegido %}<a class="sair" href="/logout">Sair</a>{% endif %}
+    </div>
+  </header>
+
   <div class="wrap">
-    <h1>Extrato PDF → Excel</h1>
-    <p class="sub">Arraste extratos em PDF de qualquer banco. Geramos uma planilha única e padronizada.</p>
+    <p class="lead">Arraste extratos em PDF de qualquer banco — geramos uma planilha
+      única, padronizada, <b>categorizada</b> e com <b>conferência de saldos</b>.</p>
 
     <div id="drop">
       <div class="big">📄→📊</div>
       <div class="txt">Arraste os PDFs aqui ou clique para escolher</div>
-      <div class="hint">Vários bancos e vários arquivos de uma vez</div>
+      <div class="hint">Vários bancos e vários arquivos de uma vez · PDFs escaneados também (OCR)</div>
       <input id="file" type="file" accept="application/pdf" multiple class="oculto">
     </div>
 
-    <ul id="lista"></ul>
+    <div id="painelLista" class="oculto">
+      <div class="lista-cab">
+        <span id="contador">0 arquivo(s)</span>
+        <button class="link" id="limpar">Limpar tudo</button>
+      </div>
+      <ul id="lista"></ul>
+    </div>
 
     <button id="enviar" class="btn" disabled>Converter para Excel</button>
-    <div id="status"></div>
 
-    <table id="relatorio" class="oculto">
-      <thead><tr><th>Arquivo</th><th>Banco</th><th>Tipo</th><th>Transações</th><th>Auditoria de saldos</th></tr></thead>
-      <tbody></tbody>
-    </table>
+    <div id="progresso">
+      <div class="barra"><div class="fill"></div></div>
+      <div class="msg" id="progMsg">Enviando…</div>
+    </div>
+
+    <div class="erro-box" id="erroBox"></div>
+
+    <!-- Resultados -->
+    <div id="saida" class="oculto">
+      <div class="resumo" id="resumo"></div>
+
+      <div class="acoes">
+        <button class="btn" id="baixarNovamente">⬇️ Baixar Excel novamente</button>
+        <button class="btn sec" id="novo">Nova conversão</button>
+      </div>
+
+      <div class="sec-titulo">Resultado por arquivo</div>
+      <div id="cards"></div>
+    </div>
+
+    <!-- Histórico -->
+    <div id="painelHist" class="oculto">
+      <div class="sec-titulo">Histórico desta sessão</div>
+      <div id="historico"></div>
+    </div>
   </div>
 
   <script>
-    const drop = document.getElementById('drop');
-    const input = document.getElementById('file');
-    const lista = document.getElementById('lista');
-    const btn = document.getElementById('enviar');
-    const status = document.getElementById('status');
-    const tabela = document.getElementById('relatorio');
-    let arquivos = [];
+    const $ = s => document.querySelector(s);
+    const drop=$('#drop'), input=$('#file'), lista=$('#lista'), painelLista=$('#painelLista'),
+          contador=$('#contador'), btn=$('#enviar'), progresso=$('#progresso'), progMsg=$('#progMsg'),
+          erroBox=$('#erroBox'), saida=$('#saida'), resumo=$('#resumo'), cards=$('#cards'),
+          painelHist=$('#painelHist'), historico=$('#historico');
 
-    function render() {
-      lista.innerHTML = '';
-      arquivos.forEach((f, i) => {
-        const li = document.createElement('li');
-        li.innerHTML = `<span>📄 ${f.name}</span><span>${(f.size/1024).toFixed(0)} KB</span>`;
+    let arquivos = [];
+    let ultimoExcel = null;      // {blob, nome}
+    const hist = [];             // conversões da sessão
+
+    const kb = n => n<1024 ? n+' B' : (n/1024).toFixed(0)+' KB';
+    const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+    function renderLista(){
+      lista.innerHTML='';
+      arquivos.forEach((f,i)=>{
+        const li=document.createElement('li');
+        li.innerHTML=`<span>📄</span><span class="nome" title="${esc(f.name)}">${esc(f.name)}</span>`+
+                     `<span class="tam">${kb(f.size)}</span>`+
+                     `<button class="rem" title="Remover" data-i="${i}">✕</button>`;
         lista.appendChild(li);
       });
-      btn.disabled = arquivos.length === 0;
+      contador.textContent = `${arquivos.length} arquivo(s)`;
+      painelLista.classList.toggle('oculto', arquivos.length===0);
+      btn.disabled = arquivos.length===0;
+    }
+    function add(files){
+      let ign=0;
+      for(const f of files){
+        if(f.name.toLowerCase().endsWith('.pdf')) arquivos.push(f); else ign++;
+      }
+      renderLista();
+      if(ign) flashErro(`${ign} arquivo(s) ignorado(s): envie apenas PDF.`);
+    }
+    lista.addEventListener('click', e=>{
+      const b=e.target.closest('.rem'); if(!b) return;
+      arquivos.splice(+b.dataset.i,1); renderLista();
+    });
+    $('#limpar').addEventListener('click', ()=>{ arquivos=[]; renderLista(); });
+
+    drop.addEventListener('click', ()=>input.click());
+    input.addEventListener('change', e=>{ add(e.target.files); input.value=''; });
+    ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('hover');}));
+    ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('hover');}));
+    drop.addEventListener('drop', e=>add(e.dataTransfer.files));
+
+    function flashErro(msg){ erroBox.textContent=msg; erroBox.style.display='block';
+      setTimeout(()=>{ erroBox.style.display='none'; }, 4000); }
+
+    function baixar(blob, nome){
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download=nome; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url), 4000);
+    }
+    function b64ToBlob(b64){
+      const bytes=Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
+      return new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     }
 
-    function add(files) {
-      for (const f of files) {
-        if (f.name.toLowerCase().endsWith('.pdf')) arquivos.push(f);
+    // etapas animadas da barra de progresso
+    const ETAPAS=['Enviando os PDFs…','Lendo os PDFs…','Reconhecendo escaneados (OCR)…',
+                  'Conferindo os saldos…','Categorizando os lançamentos…','Montando o Excel…'];
+    let etapaTimer=null;
+    function iniciarProgresso(){
+      progresso.style.display='block'; let i=0; progMsg.textContent=ETAPAS[0];
+      etapaTimer=setInterval(()=>{ i=Math.min(i+1,ETAPAS.length-1); progMsg.textContent=ETAPAS[i]; }, 1600);
+    }
+    function pararProgresso(){ clearInterval(etapaTimer); progresso.style.display='none'; }
+
+    btn.addEventListener('click', converter);
+    async function converter(){
+      if(!arquivos.length) return;
+      btn.disabled=true; saida.classList.add('oculto'); erroBox.style.display='none';
+      iniciarProgresso();
+      const fd=new FormData(); arquivos.forEach(f=>fd.append('arquivos',f));
+      try{
+        const resp=await fetch('/converter',{method:'POST',body:fd});
+        const data=await resp.json();
+        if(!resp.ok) throw new Error(data.erro||'Falha na conversão.');
+        const blob=b64ToBlob(data.arquivo_b64);
+        ultimoExcel={blob, nome:data.nome};
+        baixar(blob, data.nome);
+        mostrarResultado(data.relatorio);
+        registrarHistorico(data.relatorio, blob, data.nome);
+      }catch(err){
+        erroBox.textContent=err.message; erroBox.style.display='block';
+      }finally{
+        pararProgresso(); btn.disabled=false;
       }
-      render();
     }
 
-    drop.addEventListener('click', () => input.click());
-    input.addEventListener('change', e => add(e.target.files));
-    ['dragenter','dragover'].forEach(ev =>
-      drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('hover'); }));
-    ['dragleave','drop'].forEach(ev =>
-      drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('hover'); }));
-    drop.addEventListener('drop', e => add(e.dataTransfer.files));
+    function mostrarResultado(rel){
+      const totalTrans=rel.reduce((s,r)=>s+(r.transacoes||0),0);
+      const conferem=rel.filter(r=>!r.erro && r.auditoria && r.auditoria.conferido && r.auditoria.ok).length;
+      const alertas=rel.filter(r=>r.erro || (r.auditoria && r.auditoria.conferido && !r.auditoria.ok)).length;
+      const cats=new Set(); rel.forEach(r=>Object.keys(r.categorias||{}).forEach(c=>cats.add(c)));
 
-    btn.addEventListener('click', async () => {
-      if (!arquivos.length) return;
-      btn.disabled = true;
-      status.textContent = 'Processando…';
-      tabela.classList.add('oculto');
+      resumo.innerHTML =
+        kpi(totalTrans, 'Lançamentos') +
+        kpi(rel.length, 'Arquivo(s)') +
+        kpi(`${conferem}/${rel.length}`, 'Conferem', false) +
+        (alertas ? kpi(alertas, 'Com alerta', true) : kpi(cats.size, 'Categorias'));
 
-      const fd = new FormData();
-      arquivos.forEach(f => fd.append('arquivos', f));
-
-      try {
-        const resp = await fetch('/converter', { method:'POST', body:fd });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.erro || 'Falha na conversão.');
-
-        // baixa o Excel
-        const bytes = Uint8Array.from(atob(data.arquivo_b64), c => c.charCodeAt(0));
-        const blob = new Blob([bytes], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = data.nome; a.click();
-        URL.revokeObjectURL(url);
-
-        // mostra relatório
-        const tbody = tabela.querySelector('tbody');
-        tbody.innerHTML = '';
-        let total = 0, alertas = 0;
-        data.relatorio.forEach(r => {
-          total += r.transacoes;
-          const tr = document.createElement('tr');
-          let st;
-          if (r.erro) {
-            st = `<span class="erro">Erro: ${r.erro}</span>`;
-            alertas++;
-          } else {
-            const a = r.auditoria || {};
-            const cls = !a.conferido ? 'aviso' : (a.ok ? 'ok' : 'erro');
-            const icone = !a.conferido ? '⚠️' : (a.ok ? '✅' : '❌');
-            if (a.conferido && !a.ok) alertas++;
-            const det = (a.mensagens || []).join('\n');
-            const cats = Object.entries(r.categorias || {})
-              .sort((x, y) => y[1] - x[1])
-              .map(([nome, n]) => `${nome} (${n})`).join(' · ');
-            st = `<span class="${cls}">${icone} ${a.resumo || '—'}</span>` +
-                 (det ? `<div class="det">${det}</div>` : '') +
-                 (cats ? `<div class="det">🏷️ ${cats}</div>` : '');
-          }
-          const tipo = r.erro ? '—' : (r.tipo || '—');
-          tr.innerHTML = `<td>${r.nome}</td><td>${r.banco}</td><td>${tipo}</td><td>${r.transacoes}</td><td>${st}</td>`;
-          tbody.appendChild(tr);
-        });
-        tabela.classList.remove('oculto');
-        const aviso = alertas
-          ? ` ⚠️ ${alertas} arquivo(s) com divergência/erro — confira a coluna Auditoria.`
-          : ' ✅ Todos os saldos conferem.';
-        status.textContent = `Pronto! ${total} transações em ${data.relatorio.length} arquivo(s). O Excel foi baixado.` + aviso;
-      } catch (err) {
-        status.innerHTML = `<span class="erro">${err.message}</span>`;
-      } finally {
-        btn.disabled = false;
+      cards.innerHTML = rel.map(cardFile).join('');
+      saida.classList.remove('oculto');
+      saida.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+    function kpi(num, lab, alerta){
+      return `<div class="kpi${alerta?' alerta':''}"><div class="num">${num}</div><div class="lab">${lab}</div></div>`;
+    }
+    function cardFile(r){
+      let pill, det='';
+      if(r.erro){ pill=`<span class="pill err">❌ Erro</span>`; det=esc(r.erro); }
+      else{
+        const a=r.auditoria||{};
+        if(!a.conferido){ pill=`<span class="pill warn">⚠️ Sem conferência</span>`; }
+        else if(a.ok){ pill=`<span class="pill ok">✅ Saldos conferem</span>`; }
+        else{ pill=`<span class="pill err">❌ Divergência</span>`; }
+        det=(a.mensagens||[]).join('\n');
       }
+      const chips=Object.entries(r.categorias||{}).sort((x,y)=>y[1]-x[1])
+        .map(([n,q])=>`<span class="chip">${esc(n)} · ${q}</span>`).join('');
+      const meta = r.erro ? '' :
+        `<div class="meta">${esc(r.banco)}<span class="selo">${esc(r.tipo)}</span> · ${r.transacoes} lançamentos</div>`;
+      return `<div class="cardfile">
+        <div class="top"><div class="nome" title="${esc(r.nome)}">${esc(r.nome)}</div>${pill}</div>
+        ${meta}
+        ${chips?`<div class="chips">${chips}</div>`:''}
+        ${det?`<div class="det">${esc(det)}</div>`:''}
+      </div>`;
+    }
+
+    function registrarHistorico(rel, blob, nome){
+      const totalTrans=rel.reduce((s,r)=>s+(r.transacoes||0),0);
+      const alertas=rel.filter(r=>r.erro || (r.auditoria && r.auditoria.conferido && !r.auditoria.ok)).length;
+      const hora=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      hist.unshift({hora, nArq:rel.length, totalTrans, alertas, blob, nome});
+      renderHistorico();
+    }
+    function renderHistorico(){
+      painelHist.classList.toggle('oculto', hist.length===0);
+      historico.innerHTML = hist.map((h,i)=>{
+        const st = h.alertas ? `<span class="pill err">${h.alertas} alerta(s)</span>`
+                             : `<span class="pill ok">tudo confere</span>`;
+        return `<div class="hist">
+          <div class="info"><b>${h.hora}</b> · ${h.nArq} arquivo(s) · ${h.totalTrans} lançamentos ${st}
+            <br><small>${esc(h.nome)}</small></div>
+          <button data-h="${i}">Baixar</button>
+        </div>`;
+      }).join('');
+    }
+    historico.addEventListener('click', e=>{
+      const b=e.target.closest('button'); if(!b) return;
+      const h=hist[+b.dataset.h]; if(h) baixar(h.blob, h.nome);
+    });
+
+    $('#baixarNovamente').addEventListener('click', ()=>{
+      if(ultimoExcel) baixar(ultimoExcel.blob, ultimoExcel.nome);
+    });
+    $('#novo').addEventListener('click', ()=>{
+      arquivos=[]; renderLista(); saida.classList.add('oculto');
+      window.scrollTo({top:0, behavior:'smooth'});
     });
   </script>
 </body>

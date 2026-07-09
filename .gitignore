@@ -13,6 +13,9 @@ env/
 # Deploy
 .vercel/
 
+# Ferramentas locais (config do Claude Code)
+.claude/
+
 # PDFs de exemplo (dados sensíveis — nunca versionar)
 tests/fixtures/*.pdf
 *.pdf

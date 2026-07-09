@@ -74,7 +74,8 @@ def logout():
 @app.route("/")
 @login_required
 def index():
-    return render_template("index.html")
+    # `protegido` controla a exibição do link "Sair" (só quando há senha).
+    return render_template("index.html", protegido=bool(_SENHA))
 
 
 @app.route("/converter", methods=["POST"])
