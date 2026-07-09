@@ -67,13 +67,15 @@ def processar_pdf(caminho: str, nome_exibicao_arquivo: str) -> tuple[Extrato, Re
         )
 
 
-def converter(arquivos: list[tuple[str, str]]) -> tuple[bytes, list[ResultadoArquivo]]:
+def converter(
+    arquivos: list[tuple[str, str]]
+) -> tuple[bytes, list[ResultadoArquivo], list[Transacao]]:
     """Converte vários PDFs num único Excel.
 
     arquivos: lista de (caminho_no_disco, nome_original).
-    Retorna (bytes_xlsx, relatorio_por_arquivo). A auditoria de cada arquivo
-    (reconciliação de saldos) fica no relatório — é a checagem feita ANTES de
-    montar a planilha.
+    Retorna (bytes_xlsx, relatorio_por_arquivo, transacoes). O relatório traz a
+    auditoria de cada arquivo (reconciliação de saldos), e `transacoes` é a lista
+    achatada de lançamentos (usada para pré-visualizar na tela).
     """
     todas: list[Transacao] = []
     relatorio: list[ResultadoArquivo] = []
@@ -81,4 +83,4 @@ def converter(arquivos: list[tuple[str, str]]) -> tuple[bytes, list[ResultadoArq
         extrato, res = processar_pdf(caminho, nome)
         todas.extend(extrato.transacoes)
         relatorio.append(res)
-    return gerar_excel(todas, relatorio), relatorio
+    return gerar_excel(todas, relatorio), relatorio, todas

@@ -111,6 +111,25 @@
                  border-radius:8px;padding:6px 12px;font-weight:600;cursor:pointer;font-size:.82rem}
     .hist button:hover{background:var(--petroleo-claro)}
 
+    /* Pré-visualização de transações */
+    .prev-cab{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:26px 2px 10px}
+    .prev-cab .sec-titulo{margin:0}
+    #busca{flex:1;min-width:200px;padding:9px 12px;border:1px solid #cbd5e1;border-radius:9px;
+           font-size:.9rem;outline:none}
+    #busca:focus{border-color:var(--petroleo);box-shadow:0 0 0 3px var(--petroleo-claro)}
+    .tabela-scroll{max-height:460px;overflow:auto;border:1px solid var(--borda);
+                   border-radius:10px;background:#fff;box-shadow:var(--sombra)}
+    table.tx{width:100%;border-collapse:collapse;font-size:.85rem}
+    table.tx th{position:sticky;top:0;background:#f8fafc;color:var(--sec);text-align:left;
+                padding:9px 12px;border-bottom:1px solid var(--borda);font-weight:700;white-space:nowrap}
+    table.tx td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+    table.tx tr:hover td{background:#f8fafc}
+    table.tx .val{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+    table.tx .val.neg{color:var(--erro);font-weight:600}
+    table.tx .desc{max-width:320px}
+    table.tx .cat{color:var(--sec);white-space:nowrap}
+    .vazio{padding:20px;text-align:center;color:var(--sec);font-size:.9rem}
+
     .erro-box{background:var(--erro-bg);color:var(--erro-tx);border:1px solid #fecaca;
               border-radius:10px;padding:12px 14px;margin-top:16px;font-size:.9rem;display:none}
     .oculto{display:none}
@@ -165,6 +184,23 @@
 
       <div class="sec-titulo">Resultado por arquivo</div>
       <div id="cards"></div>
+
+      <div class="prev-cab">
+        <div class="sec-titulo">Transações</div>
+        <button class="link" id="togglePrev">Mostrar ▾</button>
+        <input id="busca" placeholder="🔎 Buscar por descrição, banco ou categoria…" class="oculto">
+      </div>
+      <div id="previewWrap" class="oculto">
+        <div class="tabela-scroll">
+          <table class="tx">
+            <thead><tr>
+              <th>Data</th><th>Descrição</th><th>Categoria</th>
+              <th style="text-align:right">Valor</th><th style="text-align:right">Saldo</th><th>Banco</th>
+            </tr></thead>
+            <tbody id="txBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- Histórico -->
@@ -181,8 +217,11 @@
           erroBox=$('#erroBox'), saida=$('#saida'), resumo=$('#resumo'), cards=$('#cards'),
           painelHist=$('#painelHist'), historico=$('#historico');
 
+    const togglePrev=$('#togglePrev'), busca=$('#busca'), previewWrap=$('#previewWrap'), txBody=$('#txBody');
+
     let arquivos = [];
     let ultimoExcel = null;      // {blob, nome}
+    let txTodas = [];            // transações da última conversão
     const hist = [];             // conversões da sessão
 
     const kb = n => n<1024 ? n+' B' : (n/1024).toFixed(0)+' KB';
@@ -257,7 +296,7 @@
         const blob=b64ToBlob(data.arquivo_b64);
         ultimoExcel={blob, nome:data.nome};
         baixar(blob, data.nome);
-        mostrarResultado(data.relatorio);
+        mostrarResultado(data.relatorio, data.transacoes || []);
         registrarHistorico(data.relatorio, blob, data.nome);
       }catch(err){
         erroBox.textContent=err.message; erroBox.style.display='block';
@@ -266,7 +305,11 @@
       }
     }
 
-    function mostrarResultado(rel){
+    function mostrarResultado(rel, transacoes){
+      txTodas = transacoes || [];
+      togglePrev.textContent = `Mostrar (${txTodas.length}) ▾`;
+      togglePrev.classList.toggle('oculto', txTodas.length===0);
+      previewWrap.classList.add('oculto'); busca.classList.add('oculto');
       const totalTrans=rel.reduce((s,r)=>s+(r.transacoes||0),0);
       const conferem=rel.filter(r=>!r.erro && r.auditoria && r.auditoria.conferido && r.auditoria.ok).length;
       const alertas=rel.filter(r=>r.erro || (r.auditoria && r.auditoria.conferido && !r.auditoria.ok)).length;
@@ -330,6 +373,46 @@
       const b=e.target.closest('button'); if(!b) return;
       const h=hist[+b.dataset.h]; if(h) baixar(h.blob, h.nome);
     });
+
+    // ---- Pré-visualização de transações ----
+    const fmtBRL = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+    function fmtData(iso){
+      if(!iso) return '—';
+      const [a,m,d]=iso.split('-'); return `${d}/${m}/${a}`;
+    }
+    function fmtValor(v){
+      if(v===null||v===undefined) return '—';
+      const cls = v<0 ? 'val neg' : 'val';
+      return `<td class="${cls}">${fmtBRL.format(v)}</td>`;
+    }
+    function renderPreview(){
+      const q = (busca.value||'').toLowerCase().trim();
+      const lista = q ? txTodas.filter(t =>
+        (t.descricao||'').toLowerCase().includes(q) ||
+        (t.banco||'').toLowerCase().includes(q) ||
+        (t.categoria||'').toLowerCase().includes(q)) : txTodas;
+      if(!lista.length){
+        txBody.innerHTML = `<tr><td colspan="6" class="vazio">Nenhuma transação encontrada.</td></tr>`;
+        return;
+      }
+      txBody.innerHTML = lista.map(t =>
+        `<tr>
+          <td>${fmtData(t.data)}</td>
+          <td class="desc">${esc(t.descricao||'')}</td>
+          <td class="cat">${esc(t.categoria||'')}</td>
+          ${fmtValor(t.valor)}
+          ${fmtValor(t.saldo)}
+          <td>${esc(t.banco||'')}</td>
+        </tr>`).join('');
+    }
+    togglePrev.addEventListener('click', ()=>{
+      const abrir = previewWrap.classList.contains('oculto');
+      previewWrap.classList.toggle('oculto', !abrir);
+      busca.classList.toggle('oculto', !abrir);
+      togglePrev.textContent = `${abrir?'Ocultar':'Mostrar'} (${txTodas.length}) ${abrir?'▴':'▾'}`;
+      if(abrir) renderPreview();
+    });
+    busca.addEventListener('input', renderPreview);
 
     $('#baixarNovamente').addEventListener('click', ()=>{
       if(ultimoExcel) baixar(ultimoExcel.blob, ultimoExcel.nome);

@@ -98,7 +98,7 @@ def rota_converter():
         if not temporarios:
             return jsonify({"erro": "Envie ao menos um arquivo PDF."}), 400
 
-        xlsx_bytes, relatorio = converter(temporarios)
+        xlsx_bytes, relatorio, transacoes = converter(temporarios)
     finally:
         for caminho, _ in temporarios:
             try:
@@ -106,10 +106,23 @@ def rota_converter():
             except OSError:
                 pass
 
-    # Retornamos o Excel (base64) + o relatório por arquivo, para exibir na tela.
+    # Retornamos o Excel (base64) + o relatório por arquivo + as transações
+    # (para a pré-visualização na tela).
     return jsonify({
         "arquivo_b64": base64.b64encode(xlsx_bytes).decode("ascii"),
         "nome": "extrato.xlsx",
+        "transacoes": [
+            {
+                "data": t.data.isoformat() if t.data else "",
+                "descricao": t.descricao,
+                "valor": t.valor,
+                "tipo": t.tipo,
+                "categoria": t.categoria,
+                "saldo": t.saldo,
+                "banco": t.banco,
+            }
+            for t in transacoes
+        ],
         "relatorio": [
             {
                 "nome": r.nome,
