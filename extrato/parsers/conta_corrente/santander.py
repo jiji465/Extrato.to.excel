@@ -110,8 +110,16 @@ def parse(caminho: str) -> Extrato:
         # Data no início da linha?
         md = _DATA.match(ls)
         if md:
-            data_atual = md.group(1)
             resto = ls[md.end():].strip()
+            # "DD/MM HH:MM CARTAO ..." é linha de DETALHE do cartão (data+hora de
+            # uso), NÃO a data do lançamento. Não muda a data corrente; só guarda
+            # a hora no último lançamento e ignora a linha.
+            hm = re.match(r"^(\d{1,2}:\d{2})\b", resto)
+            if hm:
+                if transacoes and not transacoes[-1].hora:
+                    transacoes[-1].hora = hm.group(1)
+                continue
+            data_atual = md.group(1)
         else:
             resto = ls
 
