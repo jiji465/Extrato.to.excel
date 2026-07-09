@@ -104,9 +104,12 @@ def classificar(descricao: str) -> str:
 
 
 def categorizar(transacoes: Iterable[Transacao]) -> list[Transacao]:
-    """Preenche `categoria` de cada transação (respeita valor já definido)."""
+    """Preenche `categoria` de cada transação (respeita valor já definido).
+
+    Classifica pela descrição (tipo) + favorecido, já que o nome da contraparte
+    às vezes carrega o sinal da categoria (ex.: concessionária, seguradora)."""
     lista = list(transacoes)
     for t in lista:
         if not t.categoria:
-            t.categoria = classificar(t.descricao)
+            t.categoria = classificar(f"{t.descricao} {t.favorecido}")
     return lista

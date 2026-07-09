@@ -88,13 +88,19 @@ def parse(caminho: str) -> Extrato:
                     transacoes[-1].saldo = v if sinal == "+" else -v
                 continue
 
-            # lançamento
-            nome = _nome_favorecido(pre)
-            desc = (hist + " " + nome).strip() if hist else nome
+            # lançamento: descrição = histórico (tipo); separa doc/hora/favorecido
+            docs = re.findall(r"\d{6,}", pre)
+            documento = docs[0] if docs else ""
+            hm = re.search(r"\d{2}/\d{2}\s+\d{2}:\d{2}", pre)
+            hora = hm.group(0) if hm else ""
+            favorecido = _nome_favorecido(pre)
             transacoes.append(
                 Transacao(
                     data=data_atual,
-                    descricao=re.sub(r"\s+", " ", desc).strip(" -\t"),
+                    descricao=re.sub(r"\s+", " ", (hist or "")).strip(" -\t"),
+                    favorecido=favorecido,
+                    documento=documento,
+                    hora=hora,
                     valor=v if sinal == "+" else -v,
                     banco=BANCO,
                 )
@@ -112,6 +118,17 @@ def parse(caminho: str) -> Extrato:
             resto = ls[md.end():].strip()
             hist = resto if resto else texto_anterior
             texto_anterior = ""
+            continue
+
+        # linha de detalhe "dd/dd hh:mm NOME" = complementa o último lançamento
+        det = re.match(r"^(\d{2}/\d{2}\s+\d{2}:\d{2})\s*(.*)$", ls)
+        if det and transacoes:
+            t = transacoes[-1]
+            if not t.hora:
+                t.hora = det.group(1)
+            nome = _nome_favorecido(det.group(2))
+            if nome and not t.favorecido:
+                t.favorecido = nome
             continue
 
         # linha de texto puro: candidata a histórico do próximo lançamento

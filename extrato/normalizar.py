@@ -29,12 +29,15 @@ class Transacao:
     """
 
     data: Optional[date]
-    descricao: str
+    descricao: str            # histórico/tipo do lançamento (ex.: "PIX ENVIADO")
     valor: float
     banco: str
     tipo: str = ""            # "Crédito" ou "Débito" (preenchido em pos_processar)
     saldo: Optional[float] = None
-    documento: str = ""
+    documento: str = ""       # nº do documento/identificador
+    favorecido: str = ""      # contraparte (quem recebeu/enviou)
+    hora: str = ""            # hora do lançamento, quando o extrato traz
+    arquivo: str = ""         # nome do PDF de origem (p/ conferência por arquivo)
     categoria: str = ""       # preenchido pelo categorizador
     parcela: str = ""         # ex.: "3/12" (faturas)
     moeda_origem: str = ""    # ex.: "USD" (compras internacionais)

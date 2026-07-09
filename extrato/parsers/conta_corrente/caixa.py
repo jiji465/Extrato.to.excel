@@ -34,9 +34,33 @@ _DT = re.compile(r"^(\d{2}/\d{2}/\d{4})\s*-?\s*(\d{2}):(\d{2}):(\d{2})")
 _CPF_MASK = re.compile(r"\*+\.?[\d./*]+\*+")
 
 
+# reinsere espaços perdidos pelo OCR em termos conhecidos da Caixa
+_OCR_ESPACO = [
+    (re.compile(r"PIX\s*RECEBIDO", re.I), "PIX RECEBIDO"),
+    (re.compile(r"PIX\s*ENVIADO", re.I), "PIX ENVIADO"),
+    (re.compile(r"MENSALIDADE\s*CESTA\s*SERVICO", re.I), "MENSALIDADE CESTA SERVICO"),
+    (re.compile(r"SALDO\s*DIA", re.I), "SALDO DIA"),
+    (re.compile(r"COMPRA\s*C\s*ARTAO|COMPRA\s*CARTAO", re.I), "COMPRA CARTAO"),
+    (re.compile(r"SAQUE", re.I), "SAQUE"),
+    (re.compile(r"TARIFA", re.I), "TARIFA"),
+]
+# histórico (tipo) conhecido, para separar do favorecido
+_HIST = re.compile(
+    r"^(PIX RECEBIDO|PIX ENVIADO|MENSALIDADE CESTA SERVICO|COMPRA CARTAO|"
+    r"SAQUE|TARIFA[\w ]*|TED|DOC|DEPOSITO)",
+    re.I,
+)
+
+
 def _num(txt: str, nat: str) -> float:
     v = float(txt.replace(".", "").replace(",", "."))
     return -v if nat.upper() == "D" else v
+
+
+def _normaliza_ocr(texto: str) -> str:
+    for rgx, sub in _OCR_ESPACO:
+        texto = rgx.sub(sub, texto)
+    return re.sub(r"\s+", " ", texto).strip(" -\t")
 
 
 def parse(caminho: str) -> Extrato:
@@ -70,16 +94,28 @@ def parse(caminho: str) -> Extrato:
                           int(dt.group(1)[0:2]), int(dt.group(2)),
                           int(dt.group(3)), int(dt.group(4)))
 
-        # descrição: entre o nº do documento e o 1º token de valor
+        # entre a data e o 1º valor: nº documento + histórico + favorecido + CPF
         pos_val = _VAL_CD.search(ls).start()
         meio = ls[dt.end():pos_val]
-        meio = re.sub(r"^\s*\d{4,}\s*", "", meio)      # remove nº documento
+        doc_m = re.match(r"\s*(\d{4,})", meio)         # nº do documento
+        documento = doc_m.group(1) if doc_m else ""
+        meio = re.sub(r"^\s*\d{4,}\s*", "", meio)
         meio = _CPF_MASK.sub("", meio)                 # remove CPF/CNPJ mascarado
-        descricao = re.sub(r"\s+", " ", meio).strip(" -\t")
+        meio = _normaliza_ocr(meio)                    # reinsere espaços do OCR
+
+        hm = _HIST.match(meio)
+        if hm:
+            descricao = hm.group(1).upper()
+            favorecido = meio[hm.end():].strip(" -\t")
+        else:
+            descricao, favorecido = meio, ""
 
         registros.append((quando, Transacao(
             data=parse_data(dt.group(1)),
             descricao=descricao,
+            favorecido=favorecido,
+            documento=documento,
+            hora=f"{dt.group(2)}:{dt.group(3)}:{dt.group(4)}",
             valor=valor,
             saldo=saldo,
             banco=BANCO,

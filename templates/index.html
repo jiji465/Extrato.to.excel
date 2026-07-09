@@ -194,7 +194,7 @@
         <div class="tabela-scroll">
           <table class="tx">
             <thead><tr>
-              <th>Data</th><th>Descrição</th><th>Categoria</th>
+              <th>Data</th><th>Descrição</th><th>Favorecido</th><th>Categoria</th>
               <th style="text-align:right">Valor</th><th style="text-align:right">Saldo</th><th>Banco</th>
             </tr></thead>
             <tbody id="txBody"></tbody>
@@ -389,16 +389,18 @@
       const q = (busca.value||'').toLowerCase().trim();
       const lista = q ? txTodas.filter(t =>
         (t.descricao||'').toLowerCase().includes(q) ||
+        (t.favorecido||'').toLowerCase().includes(q) ||
         (t.banco||'').toLowerCase().includes(q) ||
         (t.categoria||'').toLowerCase().includes(q)) : txTodas;
       if(!lista.length){
-        txBody.innerHTML = `<tr><td colspan="6" class="vazio">Nenhuma transação encontrada.</td></tr>`;
+        txBody.innerHTML = `<tr><td colspan="7" class="vazio">Nenhuma transação encontrada.</td></tr>`;
         return;
       }
       txBody.innerHTML = lista.map(t =>
         `<tr>
           <td>${fmtData(t.data)}</td>
           <td class="desc">${esc(t.descricao||'')}</td>
+          <td>${esc(t.favorecido||'')}</td>
           <td class="cat">${esc(t.categoria||'')}</td>
           ${fmtValor(t.valor)}
           ${fmtValor(t.saldo)}

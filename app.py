@@ -172,7 +172,10 @@ def rota_converter():
         "transacoes": [
             {
                 "data": t.data.isoformat() if t.data else "",
+                "hora": t.hora,
                 "descricao": t.descricao,
+                "favorecido": t.favorecido,
+                "documento": t.documento,
                 "valor": t.valor,
                 "tipo": t.tipo,
                 "categoria": t.categoria,

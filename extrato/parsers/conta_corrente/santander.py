@@ -117,9 +117,10 @@ def parse(caminho: str) -> Extrato:
 
         vals = valores_brl(resto)
         if not vals:
-            # linha de continuação: enriquece a descrição da última transação
+            # linha de continuação = favorecido (contraparte) da última transação
             if transacoes and not _NOISE.match(ls):
-                transacoes[-1].descricao += " " + ls
+                prev = transacoes[-1]
+                prev.favorecido = (prev.favorecido + " " + ls).strip() if prev.favorecido else ls
             continue
 
         mov_valor, mov_neg, mov_ini, _ = vals[0]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
+from typing import Optional
 
 from .auditoria import Auditoria, auditar
 from .categorizador import categorizar
@@ -30,6 +31,11 @@ class ResultadoArquivo:
     auditoria: Auditoria = field(default_factory=Auditoria)
     categorias: dict[str, int] = field(default_factory=dict)
     erro: str = ""
+    # valores de referência do próprio extrato (para as fórmulas de conferência)
+    saldo_inicial: Optional[float] = None
+    saldo_final: Optional[float] = None
+    total_creditos: Optional[float] = None
+    total_debitos: Optional[float] = None
 
     @property
     def tipo_label(self) -> str:
@@ -45,6 +51,8 @@ def processar_pdf(caminho: str, nome_exibicao_arquivo: str) -> tuple[Extrato, Re
         extrato = parser(caminho)
         extrato.transacoes = pos_processar(extrato.transacoes)
         categorizar(extrato.transacoes)
+        for t in extrato.transacoes:            # marca a origem (p/ conferência)
+            t.arquivo = nome_exibicao_arquivo
         aud = auditar(extrato)
         cats = dict(Counter(t.categoria for t in extrato.transacoes if t.categoria))
         return extrato, ResultadoArquivo(
@@ -54,6 +62,10 @@ def processar_pdf(caminho: str, nome_exibicao_arquivo: str) -> tuple[Extrato, Re
             n_transacoes=len(extrato.transacoes),
             auditoria=aud,
             categorias=cats,
+            saldo_inicial=extrato.saldo_inicial,
+            saldo_final=extrato.saldo_final,
+            total_creditos=extrato.total_creditos,
+            total_debitos=extrato.total_debitos,
         )
     except Exception as exc:  # noqa: BLE001 - reportamos ao usuário
         from .ocr import OCRIndisponivel

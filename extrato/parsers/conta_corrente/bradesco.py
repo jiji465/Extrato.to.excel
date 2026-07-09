@@ -39,24 +39,43 @@ def parse(caminho: str) -> Extrato:
     transacoes: list[Transacao] = []
     in_sec = False
     data_atual = None
-    buffer: list[str] = []          # linhas de descrição sem valor
+    buffer: list[str] = []          # descrição (linhas ANTES do valor)
 
-    def _desc_pre(texto: str) -> str:
-        # remove nº de documento (inteiro) no fim do trecho de descrição
-        return re.sub(r"\s*\d{3,}\s*$", "", texto).strip(" -\t")
+    def _sem_secao(ls: str) -> str:
+        """Devolve o 'resto' após a data (se houver) para uma linha."""
+        md = _DATA.match(ls)
+        return ls[md.end():].strip() if md else ls
 
-    for linha in linhas:
+    def _eh_valor(ls: str) -> bool:
+        r = _sem_secao(ls)
+        if "SALDO ANTERIOR" in r.upper() or r.lower().startswith("total"):
+            return False
+        return bool(valores_brl(r))
+
+    def _proximo_tipo(i: int) -> str:
+        """'valor' se a próxima linha significativa tem valor; senão 'limite'."""
+        for j in range(i + 1, len(linhas)):
+            s = linhas[j].strip()
+            if not s:
+                continue
+            if _FIM.match(s) or s.lower().startswith(("total",)) \
+                    or "SALDO ANTERIOR" in _sem_secao(s).upper():
+                return "limite"
+            if _eh_valor(s):
+                return "valor"
+            # linha de descrição pura: continua procurando
+        return "limite"
+
+    for i, linha in enumerate(linhas):
         ls = linha.strip()
         if _HEADER.search(ls):
             in_sec = True
             continue
         if not in_sec or not ls:
             continue
-
         if _FIM.match(ls):
             break
 
-        # data no início?
         md = _DATA.match(ls)
         if md:
             data_atual = parse_data(md.group(1))
@@ -78,14 +97,17 @@ def parse(caminho: str) -> Extrato:
                 extrato.total_creditos = vals[0][0]
                 extrato.total_debitos = vals[1][0]
                 extrato.saldo_final = -vals[2][0] if vals[2][1] else vals[2][0]
-            if buffer and transacoes:
-                transacoes[-1].descricao += " " + " ".join(buffer)
-                buffer.clear()
             continue
 
         vals = valores_brl(resto)
         if not vals:
-            buffer.append(resto)       # descrição pura
+            # descrição pura: é do PRÓXIMO lançamento (antes do valor) ou o
+            # favorecido do lançamento ANTERIOR (depois do valor)?
+            if _proximo_tipo(i) == "valor":
+                buffer.append(resto)                      # antes -> descrição
+            elif transacoes:
+                prev = transacoes[-1]                     # depois -> favorecido
+                prev.favorecido = (prev.favorecido + " " + resto).strip() if prev.favorecido else resto
             continue
 
         # linha com valor => fecha uma transação
@@ -96,8 +118,11 @@ def parse(caminho: str) -> Extrato:
             s = vals[-1]
             saldo = -s[0] if s[1] else s[0]
 
-        pre = _desc_pre(resto[: mov[2]])
-        partes = [p for p in ([" ".join(buffer).strip()] + [pre]) if p]
+        pre = resto[: mov[2]].rstrip(" -\t")
+        doc_m = re.search(r"(\d+)\s*$", pre)               # nº do documento (Dcto)
+        documento = doc_m.group(1) if doc_m else ""
+        tipo_txt = re.sub(r"\s*\d+\s*$", "", pre).strip(" -\t")
+        partes = [p for p in [" ".join(buffer).strip(), tipo_txt] if p]
         descricao = " ".join(partes).strip(" -\t")
         buffer.clear()
 
@@ -107,6 +132,7 @@ def parse(caminho: str) -> Extrato:
                 descricao=descricao,
                 valor=valor,
                 saldo=saldo,
+                documento=documento,
                 banco=BANCO,
             )
         )

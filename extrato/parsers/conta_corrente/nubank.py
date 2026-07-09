@@ -50,6 +50,14 @@ _SKIP = re.compile(
     r"Extrato gerado|R\$ |\d{6,})"
 )
 
+# tipos de lançamento do Nubank, para separar o favorecido da descrição
+_TIPO_NUBANK = re.compile(
+    r"^(Transferência\s+(?:enviada|recebida)(?:\s+pelo\s+Pix)?|"
+    r"Compra no débito|Pagamento de boleto|Pagamento de fatura|"
+    r"Aplicação RDB|Resgate RDB|Estorno|Reembolso|Débito automático)",
+    re.IGNORECASE,
+)
+
 
 def _valor_label(linhas: list[str], rotulo: str):
     """Primeiro valor que aparece LOGO APÓS o rótulo (na mesma linha)."""
@@ -127,17 +135,25 @@ def parse(caminho: str) -> Extrato:
 
         vals = valores_brl(ls)
         if not vals:
-            # continuação (dados bancários do favorecido)
-            if transacoes:
-                transacoes[-1].descricao += " " + ls
+            # linha de continuação = dados bancários (agência/conta) — ignorada
             continue
 
         valor_abs = vals[-1][0]
-        descricao = ls[: vals[-1][2]].strip(" -\t")
+        texto = ls[: vals[-1][2]].strip(" -\t")
+        m = _TIPO_NUBANK.match(texto)
+        if m:
+            descricao = re.sub(r"\s+", " ", m.group(1)).strip()
+            resto = texto[m.end():]
+            # favorecido = nome antes do CPF mascarado / separador " - "
+            favorecido = re.split(r"\s+[-–]\s+|\s+•", resto)[0].strip(" -\t")
+        else:
+            descricao, favorecido = texto, ""
+
         transacoes.append(
             Transacao(
                 data=data_atual,
                 descricao=descricao,
+                favorecido=favorecido,
                 valor=sinal * valor_abs,
                 banco=BANCO,
             )
