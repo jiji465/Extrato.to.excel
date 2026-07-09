@@ -5,6 +5,11 @@
 > - Prefira proteger com **senha** (variável `EXTRATO_SENHA`).
 > - Nunca versione PDFs de clientes (o `.gitignore` já bloqueia `*.pdf`).
 > - Ciente do risco, dá para deixar público (sem senha) — é sua decisão.
+>
+> **Proteções já embutidas (automáticas, sem configurar):** cabeçalhos de
+> segurança + `Cache-Control: no-store` em toda resposta; limite de 30 arquivos
+> por requisição; rate limit por IP (20 conversões/min); e limpeza do texto de
+> OCR da memória ao fim de cada requisição. Nada de conteúdo é registrado em log.
 
 ## Resumo da escolha
 

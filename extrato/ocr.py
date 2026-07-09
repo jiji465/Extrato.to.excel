@@ -76,7 +76,12 @@ def _ocr(caminho: str, dpi: int) -> list[str]:
 
 
 def linhas_ocr(caminho: str, dpi: int = 300) -> list[str]:
-    """Linhas de texto reconhecidas por OCR (cacheado por arquivo+mtime+dpi)."""
+    """Linhas de texto reconhecidas por OCR.
+
+    Usa um cache curto (por arquivo+mtime+dpi) só para evitar rodar o OCR duas
+    vezes na MESMA requisição (detecção + parsing). O servidor limpa o cache ao
+    fim de cada requisição (`limpar_cache`), então o texto não persiste na RAM.
+    """
     try:
         mtime = os.path.getmtime(caminho)
     except OSError:
@@ -85,6 +90,11 @@ def linhas_ocr(caminho: str, dpi: int = 300) -> list[str]:
     if chave not in _cache:
         _cache[chave] = _ocr(caminho, dpi)
     return _cache[chave]
+
+
+def limpar_cache() -> None:
+    """Descarta da memória todo o texto de OCR em cache (privacidade)."""
+    _cache.clear()
 
 
 def disponivel() -> bool:

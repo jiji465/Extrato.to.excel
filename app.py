@@ -3,13 +3,15 @@
 Uso local: `python app.py` (abre em http://127.0.0.1:5000).
 Uso em produção (internet): rodar via gunicorn (ver Procfile) atrás de HTTPS.
 
-Segurança: o acesso exige LOGIN (senha compartilhada da equipe). Configure por
-variáveis de ambiente:
-  EXTRATO_SENHA   -> senha de acesso da equipe (OBRIGATÓRia em produção)
-  EXTRATO_SECRET  -> chave secreta das sessões (defina um valor aleatório fixo)
+Privacidade: os PDFs são processados em arquivo temporário e APAGADOS logo em
+seguida; o Excel é montado em memória. Nada é armazenado nem registrado no
+servidor. Após cada requisição, o cache de OCR também é limpo da memória.
 
-Os PDFs enviados são processados em memória/arquivo temporário e APAGADOS logo
-em seguida — nada é armazenado no servidor.
+Segurança:
+- Login é OPCIONAL. Sem `EXTRATO_SENHA`, o acesso é público (sem senha).
+  Com `EXTRATO_SENHA` definida (+ `EXTRATO_SECRET`), exige login da equipe.
+- Cabeçalhos de segurança e `Cache-Control: no-store` em toda resposta.
+- Rate limit por IP e limite de arquivos por requisição contra abuso.
 """
 
 from __future__ import annotations
@@ -18,24 +20,72 @@ import base64
 import hmac
 import os
 import tempfile
+import time
+from collections import deque
 from functools import wraps
 
 from flask import (
     Flask, jsonify, redirect, render_template, request, session, url_for
 )
 
+from extrato import ocr
 from extrato.conversor import converter
 
 # Caminho absoluto dos templates — robusto em serverless (Vercel) e local.
 _BASE = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, template_folder=os.path.join(_BASE, "templates"))
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB por requisição
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=True,   # cookie de sessão só por HTTPS
+)
 
 # Chave de sessão: defina EXTRATO_SECRET em produção (fixa entre reinícios/workers).
 app.secret_key = os.environ.get("EXTRATO_SECRET") or os.urandom(32)
 
-# Senha de acesso da equipe. Em produção, defina EXTRATO_SENHA.
+# Senha de acesso da equipe. Vazia => acesso público (sem login).
 _SENHA = os.environ.get("EXTRATO_SENHA", "")
+
+# Limites contra abuso.
+MAX_ARQUIVOS = 30          # arquivos por requisição
+RATE_LIMITE = 20           # requisições de conversão...
+RATE_JANELA = 60           # ...por IP a cada 60 s
+_req_por_ip: dict[str, deque] = {}
+
+
+def _ip_cliente() -> str:
+    xff = request.headers.get("X-Forwarded-For", "")
+    return xff.split(",")[0].strip() if xff else (request.remote_addr or "?")
+
+
+def _rate_ok(ip: str) -> bool:
+    agora = time.time()
+    dq = _req_por_ip.setdefault(ip, deque())
+    while dq and dq[0] < agora - RATE_JANELA:
+        dq.popleft()
+    if len(dq) >= RATE_LIMITE:
+        return False
+    dq.append(agora)
+    return True
+
+
+@app.after_request
+def _cabecalhos_seguranca(resp):
+    resp.headers["Cache-Control"] = "no-store, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    resp.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    resp.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+        "connect-src 'self'; object-src 'none'; base-uri 'none'; "
+        "form-action 'self'; frame-ancestors 'none'"
+    )
+    return resp
 
 
 def login_required(view):
@@ -81,9 +131,15 @@ def index():
 @app.route("/converter", methods=["POST"])
 @login_required
 def rota_converter():
+    if not _rate_ok(_ip_cliente()):
+        return jsonify({"erro": "Muitas conversões em pouco tempo. "
+                                "Aguarde um minuto e tente novamente."}), 429
+
     enviados = request.files.getlist("arquivos")
     if not enviados:
         return jsonify({"erro": "Nenhum arquivo enviado."}), 400
+    if len(enviados) > MAX_ARQUIVOS:
+        return jsonify({"erro": f"Máximo de {MAX_ARQUIVOS} arquivos por vez."}), 400
 
     temporarios: list[tuple[str, str]] = []
     try:
@@ -105,6 +161,8 @@ def rota_converter():
                 os.remove(caminho)
             except OSError:
                 pass
+        # apaga da memória qualquer texto de OCR desta requisição
+        ocr.limpar_cache()
 
     # Retornamos o Excel (base64) + o relatório por arquivo + as transações
     # (para a pré-visualização na tela).
