@@ -30,6 +30,7 @@ from flask import (
 
 from extrato import ocr
 from extrato.conversor import converter
+from extrato.identificacao import sanitizar_arquivo
 
 # Caminho absoluto dos templates — robusto em serverless (Vercel) e local.
 _BASE = os.path.dirname(os.path.abspath(__file__))
@@ -68,6 +69,31 @@ def _rate_ok(ip: str) -> bool:
         return False
     dq.append(agora)
     return True
+
+
+def _nome_excel(relatorio) -> str:
+    """Monta 'Extrato - <Empresa> - <Banco> - <Mês>.xlsx' a partir dos extratos.
+
+    Quando há vários arquivos com valores diferentes, usa 'Vários' na parte que
+    difere.
+    """
+    validos = [r for r in relatorio if not r.erro and r.n_transacoes]
+    if not validos:
+        return "extrato.xlsx"
+
+    def unico(vals, plural):
+        u = list(dict.fromkeys(v for v in vals if v))
+        if len(u) == 1:
+            return u[0]
+        return plural if len(u) > 1 else ""
+
+    partes = ["Extrato"]
+    for p in (unico((r.titular for r in validos), "Vários titulares"),
+              unico((r.banco for r in validos), "Vários bancos"),
+              unico((r.periodo for r in validos), "Vários períodos")):
+        if p:
+            partes.append(p)
+    return sanitizar_arquivo(" - ".join(partes)) + ".xlsx"
 
 
 @app.after_request
@@ -168,7 +194,7 @@ def rota_converter():
     # (para a pré-visualização na tela).
     return jsonify({
         "arquivo_b64": base64.b64encode(xlsx_bytes).decode("ascii"),
-        "nome": "extrato.xlsx",
+        "nome": _nome_excel(relatorio),
         "transacoes": [
             {
                 "data": t.data.isoformat() if t.data else "",

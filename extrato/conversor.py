@@ -9,6 +9,7 @@ from typing import Optional
 from .auditoria import Auditoria, auditar
 from .categorizador import categorizar
 from .detector import detectar
+from .identificacao import extrair_titular, periodo_das_datas
 from .excel import gerar_excel
 from .normalizar import Extrato, Transacao, pos_processar
 from .parsers import obter_parser
@@ -31,6 +32,9 @@ class ResultadoArquivo:
     auditoria: Auditoria = field(default_factory=Auditoria)
     categorias: dict[str, int] = field(default_factory=dict)
     erro: str = ""
+    # identificação (para nomear o Excel)
+    titular: str = ""
+    periodo: str = ""
     # valores de referência do próprio extrato (para as fórmulas de conferência)
     saldo_inicial: Optional[float] = None
     saldo_final: Optional[float] = None
@@ -62,6 +66,8 @@ def processar_pdf(caminho: str, nome_exibicao_arquivo: str) -> tuple[Extrato, Re
             n_transacoes=len(extrato.transacoes),
             auditoria=aud,
             categorias=cats,
+            titular=extrair_titular(texto, chave),
+            periodo=periodo_das_datas([t.data for t in extrato.transacoes]),
             saldo_inicial=extrato.saldo_inicial,
             saldo_final=extrato.saldo_final,
             total_creditos=extrato.total_creditos,
