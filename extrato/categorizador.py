@@ -67,10 +67,12 @@ REGRAS: list[tuple[str, list[str]]] = [
     ]),
     ("Pix recebido", [
         r"pix[\s\-]*recebido", r"recebida pelo pix", r"recebido pelo pix",
+        r"pix[\s.\-]*receb", r"transf[\s.\-]*receb[\s.\-]*pix",  # Sicoob: PIX RECEB.OUTRA IF
     ]),
     ("Pix enviado", [
         r"pix[\s\-]*enviado", r"pix[\s\-]*agendado", r"enviada pelo pix",
         r"enviado pelo pix",
+        r"pix[\s.\-]*emit", r"transf[\s.]*pix",  # Sicoob: PIX EMIT.OUTRA IF / TRANSF. PIX
     ]),
     ("Compras", [
         r"compra no debito", r"compra no credito", r"compra com cartao",
@@ -78,12 +80,18 @@ REGRAS: list[tuple[str, list[str]]] = [
     ]),
     ("Boletos e Fornecedores", [
         r"boleto", r"pagamento de boleto", r"fornecedor", r"pagamento a",
+        r"tit\.?\s*compe", r"deb\.?\s*tit", r"tit\.?\s*cobran",  # Sicoob: DÉB.TIT.COMPE / DÉB.TIT.COBRANÇA
+    ]),
+    ("Cobrança recebida", [
+        r"liq\.?\s*cobran", r"cred\.?\s*liq",  # Sicoob: CRÉD.LIQ.COBRANÇA (títulos recebidos)
     ]),
     ("Transferências", [
         r"\bted\b", r"\bdoc\b", r"transferenc", r"transf ", r"transf\.",
+        r"transf\.contas", r"transf\.receb",  # Sicoob: CRED.TRANSF.CONTAS
     ]),
     ("Saques e Depósitos", [
         r"saque", r"deposito", r"deposit", r"dep dinheiro", r"dep .*atm",
+        r"dep\.?\s*dinheiro", r"dep\s+din",  # Sicoob: DEP.DINHEIRO / DEP DIN AG
     ]),
 ]
 

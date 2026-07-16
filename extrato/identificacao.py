@@ -38,6 +38,13 @@ def extrair_titular(texto: str, banco_chave: str) -> str:
             if re.search(r"\|\s*cnpj", l, re.I):
                 return _limpa_nome(l)
 
+    if banco_chave == "sicoob":
+        # Cabeçalho: "CONTA: 99-0 / LZ COMERCIO DE PRODUTOS AGROPECUARIOS LTDA"
+        for l in linhas:
+            m = re.match(r"conta:\s*[\d\-]+\s*/\s*(.+)", l, re.I)
+            if m:
+                return _limpa_nome(m.group(1))
+
     # BB, Caixa e genérico: linha "Cliente <NOME>"
     for l in linhas:
         m = re.match(r"cliente\s+(.+)", l, re.I)

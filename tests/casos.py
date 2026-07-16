@@ -64,6 +64,16 @@ CASOS: list[dict] = [
         "auditoria_ok": True,
     },
     {
+        # Layout por coordenadas: coluna VALOR à direita com C/D que "vaza" de
+        # linha; extrato em ordem cronológica inversa; checkpoints SALDO DO DIA.
+        "id": "sicoob",
+        "arquivo": _fx("sicoob.pdf"),
+        "banco": "Sicoob",
+        "tipo": "conta_corrente",
+        "min_transacoes": 900,
+        "auditoria_ok": True,
+    },
+    {
         # PDF escaneado — exercita o caminho de OCR (RapidOCR) ponta a ponta.
         "id": "caixa_ocr",
         "arquivo": _fx("caixa.pdf"),

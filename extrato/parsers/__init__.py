@@ -21,6 +21,7 @@ from .conta_corrente import (
     caixa as cc_caixa,
     inter as cc_inter,
     c6 as cc_c6,
+    sicoob as cc_sicoob,
 )
 
 Parser = Callable[[str], Extrato]
@@ -35,6 +36,7 @@ _REGISTRO: dict[tuple[str, str], Parser] = {
     ("caixa", CONTA_CORRENTE): cc_caixa.parse,
     ("inter", CONTA_CORRENTE): cc_inter.parse,
     ("c6", CONTA_CORRENTE): cc_c6.parse,
+    ("sicoob", CONTA_CORRENTE): cc_sicoob.parse,
     # Faturas e investimentos: parsers dedicados serão registrados aqui
     # conforme os PDFs de exemplo forem chegando.
 }
