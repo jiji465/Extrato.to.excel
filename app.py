@@ -98,17 +98,25 @@ def _nome_excel(relatorio) -> str:
 
 @app.after_request
 def _cabecalhos_seguranca(resp):
-    resp.headers["Cache-Control"] = "no-store, max-age=0"
-    resp.headers["Pragma"] = "no-cache"
+    if request.path.startswith("/static/"):
+        # Bibliotecas públicas (pdf.js/tesseract.js) — pode cachear à vontade;
+        # nenhum dado do usuário passa por aqui.
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    else:
+        resp.headers["Cache-Control"] = "no-store, max-age=0"
+        resp.headers["Pragma"] = "no-cache"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["Referrer-Policy"] = "no-referrer"
     resp.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
     resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    # 'wasm-unsafe-eval' e worker-src: necessários para o OCR no NAVEGADOR
+    # (tesseract.js/pdf.js, servidos do próprio site — nada externo).
     resp.headers["Content-Security-Policy"] = (
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
-        "connect-src 'self'; object-src 'none'; base-uri 'none'; "
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+        "connect-src 'self'; worker-src 'self' blob:; "
+        "object-src 'none'; base-uri 'none'; "
         "form-action 'self'; frame-ancestors 'none'"
     )
     return resp
@@ -173,12 +181,20 @@ def rota_converter():
     temporarios: list[tuple[str, str]] = []
     try:
         for f in enviados:
-            if not f.filename.lower().endswith(".pdf"):
+            low = f.filename.lower()
+            if low.endswith(".pdf"):
+                sufixo, nome_exib = ".pdf", f.filename
+            elif low.endswith(".pdf.txt"):
+                # PDF escaneado cujo OCR foi feito no NAVEGADOR do usuário
+                # (onde o servidor não tem OCR, ex.: Vercel). Contém as linhas
+                # de texto reconhecidas; o nome exibido volta a ser o do PDF.
+                sufixo, nome_exib = ".txt", f.filename[:-4]
+            else:
                 continue
-            fd, caminho = tempfile.mkstemp(suffix=".pdf")
+            fd, caminho = tempfile.mkstemp(suffix=sufixo)
             os.close(fd)
             f.save(caminho)
-            temporarios.append((caminho, f.filename))
+            temporarios.append((caminho, nome_exib))
 
         if not temporarios:
             return jsonify({"erro": "Envie ao menos um arquivo PDF."}), 400

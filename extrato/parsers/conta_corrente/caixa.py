@@ -15,6 +15,11 @@ Regras:
 - Os dois últimos tokens "NNN,NN C|D" da linha são valor e saldo.
 - Lançamentos vêm em ordem cronológica INVERSA; ordenamos por data/hora.
 - "SALDO ANTERIOR" = abertura; linhas "SALDO DIA" são marcadores (ignoradas).
+- Tolerância a OCR: se a vírgula de UM dos dois números da linha se perdeu
+  (ex.: "12247 C 1.404,66 C"), o extrato tem redundância — cada linha traz o
+  saldo após o lançamento. O número legível é classificado pela posição (saldo
+  fica no fim da linha) e o valor faltante é DERIVADO da diferença de saldos.
+  A auditoria global (saldo inicial + Σ = saldo final) segue validando tudo.
 """
 
 from __future__ import annotations
@@ -85,11 +90,21 @@ def parse(caminho: str) -> Extrato:
         if not dt:
             continue
         vals = _VAL_CD.findall(ls)
-        if len(vals) < 2:
+        if not vals:
             continue
 
-        valor = _num(*vals[-2])
-        saldo = _num(*vals[-1])
+        if len(vals) >= 2:
+            valor = _num(*vals[-2])
+            saldo = _num(*vals[-1])
+        else:
+            # Só um número legível: o OCR perdeu a vírgula do outro. O saldo é
+            # o ÚLTIMO token da linha; se o número achado termina perto do fim,
+            # ele é o saldo (valor será derivado depois); senão é o valor.
+            m_unico = list(_VAL_CD.finditer(ls))[-1]
+            if len(ls) - m_unico.end() <= 3:
+                valor, saldo = None, _num(*vals[-1])
+            else:
+                valor, saldo = _num(*vals[-1]), None
         quando = datetime(int(dt.group(1)[6:10]), int(dt.group(1)[3:5]),
                           int(dt.group(1)[0:2]), int(dt.group(2)),
                           int(dt.group(3)), int(dt.group(4)))
@@ -101,6 +116,8 @@ def parse(caminho: str) -> Extrato:
         documento = doc_m.group(1) if doc_m else ""
         meio = re.sub(r"^\s*\d{4,}\s*", "", meio)
         meio = _CPF_MASK.sub("", meio)                 # remove CPF/CNPJ mascarado
+        # resto de número quebrado pelo OCR no fim (ex.: "12247 C") não é nome
+        meio = re.sub(r"[\d.,]+\s*[CD]?\s*$", "", meio)
         meio = _normaliza_ocr(meio)                    # reinsere espaços do OCR
 
         hm = _HIST.match(meio)
@@ -123,7 +140,27 @@ def parse(caminho: str) -> Extrato:
 
     # ordena cronologicamente (o extrato vem em ordem inversa)
     registros.sort(key=lambda r: r[0])
-    extrato.transacoes = [t for _, t in registros]
-    if extrato.transacoes:
-        extrato.saldo_final = extrato.transacoes[-1].saldo
+    transacoes = [t for _, t in registros]
+
+    # Deriva valores que o OCR perdeu (vírgula sumida) pela cadeia de saldos:
+    # valor = saldo desta linha − saldo anterior. Linhas sem como derivar são
+    # descartadas — a auditoria acusará o buraco na cadeia (nunca silencioso).
+    saldo_ant = extrato.saldo_inicial
+    completas: list[Transacao] = []
+    for t in transacoes:
+        if t.valor is None:
+            if t.saldo is not None and saldo_ant is not None:
+                t.valor = round(t.saldo - saldo_ant, 2)
+            else:
+                continue
+        completas.append(t)
+        if t.saldo is not None:
+            saldo_ant = t.saldo
+        elif saldo_ant is not None:
+            saldo_ant = round(saldo_ant + t.valor, 2)
+
+    extrato.transacoes = completas
+    if completas:
+        # saldo do último lançamento; se ilegível no OCR, usa o acumulado
+        extrato.saldo_final = completas[-1].saldo if completas[-1].saldo is not None else saldo_ant
     return extrato

@@ -27,11 +27,25 @@ def _texto_vazio(linhas: list[str]) -> bool:
     return len("".join(linhas).strip()) < 20
 
 
+def _eh_texto_ocr(caminho: str) -> bool:
+    """Arquivo .txt com linhas já reconhecidas por OCR no NAVEGADOR do usuário
+    (caminho usado onde o OCR do servidor não existe, ex.: Vercel)."""
+    return caminho.lower().endswith(".txt")
+
+
+def _linhas_txt(caminho: str) -> list[str]:
+    with open(caminho, encoding="utf-8", errors="replace") as fh:
+        return [l.rstrip("\r\n") for l in fh]
+
+
 def linhas_do_pdf(caminho: str, x_tolerance: int = 1) -> list[str]:
     """Todas as linhas de texto do PDF, na ordem de leitura.
 
     Se o PDF não tem camada de texto (escaneado), cai automaticamente no OCR.
+    Um .txt (OCR feito no navegador) é lido diretamente como linhas.
     """
+    if _eh_texto_ocr(caminho):
+        return _linhas_txt(caminho)
     linhas: list[str] = []
     with pdfplumber.open(caminho) as pdf:
         for page in pdf.pages:
@@ -46,7 +60,10 @@ def linhas_do_pdf(caminho: str, x_tolerance: int = 1) -> list[str]:
 def texto_do_pdf(caminho: str, paginas: Optional[int] = None) -> str:
     """Texto concatenado do PDF (usado pelo detector de banco/tipo).
 
-    Cai no OCR quando o PDF é escaneado (sem texto selecionável)."""
+    Cai no OCR quando o PDF é escaneado (sem texto selecionável). Um .txt
+    (OCR feito no navegador) é lido diretamente."""
+    if _eh_texto_ocr(caminho):
+        return "\n".join(_linhas_txt(caminho))
     partes: list[str] = []
     with pdfplumber.open(caminho) as pdf:
         pages = pdf.pages if paginas is None else pdf.pages[:paginas]
