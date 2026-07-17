@@ -6,7 +6,10 @@ services:
     runtime: python
     plan: free                       # suba para 'starter' se faltar memória no OCR
     buildCommand: pip install -r requirements-ocr.txt
-    startCommand: gunicorn app:app --workers 2 --timeout 120
+    # --bind 0.0.0.0:$PORT é OBRIGATÓRIO no Render (senão o serviço sobe numa
+    # porta que o Render não checa e o deploy falha). 1 worker p/ caber na RAM
+    # do plano free durante o OCR (suba p/ 2 no Starter).
+    startCommand: gunicorn app:app --workers 1 --timeout 120 --bind 0.0.0.0:$PORT
     envVars:
       - key: EXTRATO_SECRET
         generateValue: true          # chave de sessão gerada automaticamente
