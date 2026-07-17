@@ -57,7 +57,7 @@ REGRAS: list[tuple[str, list[str]]] = [
     ]),
     ("Concessionárias", [
         r"agua", r"esgoto", r"saneament", r"energia", r"eletric", r"\bgas\b",
-        r"\bluz\b", r"telefon", r"internet", r"celular", r"\bvivo\b",
+        r"\bluz\b", r"telefon", r"\binternet\b", r"celular", r"\bvivo\b",
         r"\bclaro\b", r"\btim\b", r"\boi\b", r"copasa", r"cemig", r"enel",
         r"sabesp", r"copel", r"light",
     ]),
@@ -86,8 +86,8 @@ REGRAS: list[tuple[str, list[str]]] = [
         r"liq\.?\s*cobran", r"cred\.?\s*liq",  # Sicoob: CRÉD.LIQ.COBRANÇA (títulos recebidos)
     ]),
     ("Transferências", [
-        r"\bted\b", r"\bdoc\b", r"transferenc", r"transf ", r"transf\.",
-        r"transf\.contas", r"transf\.receb",  # Sicoob: CRED.TRANSF.CONTAS
+        r"\bted\b", r"\btev\b", r"\bdoc\b", r"transferenc", r"transf",
+        r"envio.*transf",  # Caixa (OCR junta palavras): ENVIOTRANSFINTERNETTEV
     ]),
     ("Saques e Depósitos", [
         r"saque", r"deposito", r"deposit", r"dep dinheiro", r"dep .*atm",
