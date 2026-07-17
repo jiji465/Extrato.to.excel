@@ -152,7 +152,7 @@
     <div id="drop">
       <div class="big">📄→📊</div>
       <div class="txt">Arraste os PDFs aqui ou clique para escolher</div>
-      <div class="hint">Vários bancos e vários arquivos de uma vez · PDFs escaneados também (OCR)</div>
+      <div class="hint">Vários bancos e vários arquivos de uma vez{% if ocr_disponivel %} · PDFs escaneados também (OCR){% else %} · PDFs digitais (escaneados: use o app local){% endif %}</div>
       <input id="file" type="file" accept="application/pdf" multiple class="oculto">
     </div>
 
@@ -274,7 +274,7 @@
     }
 
     // etapas animadas da barra de progresso
-    const ETAPAS=['Enviando os PDFs…','Lendo os PDFs…','Reconhecendo escaneados (OCR)…',
+    const ETAPAS=['Enviando os PDFs…','Lendo os PDFs…',{% if ocr_disponivel %}'Reconhecendo escaneados (OCR)…',{% endif %}
                   'Conferindo os saldos…','Categorizando os lançamentos…','Montando o Excel…'];
     let etapaTimer=null;
     function iniciarProgresso(){

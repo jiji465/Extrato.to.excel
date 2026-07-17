@@ -151,7 +151,10 @@ def logout():
 @login_required
 def index():
     # `protegido` controla a exibição do link "Sair" (só quando há senha).
-    return render_template("index.html", protegido=bool(_SENHA))
+    # `ocr_disponivel` evita prometer OCR onde ele não roda (ex.: Vercel).
+    return render_template(
+        "index.html", protegido=bool(_SENHA), ocr_disponivel=ocr.disponivel()
+    )
 
 
 @app.route("/converter", methods=["POST"])
