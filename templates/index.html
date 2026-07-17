@@ -225,7 +225,9 @@
     const hist = [];             // conversões da sessão
 
     const kb = n => n<1024 ? n+' B' : (n/1024).toFixed(0)+' KB';
-    const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    // escapa também aspas: os valores entram em atributos (title="...")
+    const esc = s => String(s).replace(/[&<>"']/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
     function renderLista(){
       lista.innerHTML='';
@@ -241,12 +243,17 @@
       btn.disabled = arquivos.length===0;
     }
     function add(files){
-      let ign=0;
+      let ign=0, dup=0;
       for(const f of files){
-        if(f.name.toLowerCase().endsWith('.pdf')) arquivos.push(f); else ign++;
+        if(!f.name.toLowerCase().endsWith('.pdf')){ ign++; continue; }
+        if(arquivos.some(a=>a.name===f.name && a.size===f.size)){ dup++; continue; }
+        arquivos.push(f);
       }
       renderLista();
-      if(ign) flashErro(`${ign} arquivo(s) ignorado(s): envie apenas PDF.`);
+      const avisos=[];
+      if(ign) avisos.push(`${ign} ignorado(s): envie apenas PDF`);
+      if(dup) avisos.push(`${dup} repetido(s) não adicionado(s)`);
+      if(avisos.length) flashErro(avisos.join(' · ')+'.');
     }
     lista.addEventListener('click', e=>{
       const b=e.target.closest('.rem'); if(!b) return;
@@ -343,14 +350,26 @@
       if(!OCR_NO_NAVEGADOR && !window.FORCAR_OCR_NAV) return files;
       await carregarScript('/static/vendor/pdfjs/pdf.min.js');
       pdfjsLib.GlobalWorkerOptions.workerSrc='/static/vendor/pdfjs/pdf.worker.min.js';
-      const out=[]; let worker=null;
+      const out=[]; const problemas=[]; let worker=null;
       try{
         for(const f of files){
           let doc=null;
           try{
             const buf=await f.arrayBuffer();
             const bytes=new Uint8Array(buf.slice(0));   // cópia: o pdf.js "transfere" o buf
-            doc=await pdfjsLib.getDocument({data:buf}).promise;
+            try{
+              doc=await pdfjsLib.getDocument({data:buf}).promise;
+            }catch(e){
+              if(e && e.name==='PasswordException'){
+                problemas.push(`"${f.name}" está protegido por senha — remova a senha e reenvie`);
+                continue;
+              }
+              if(e && e.name==='InvalidPDFException'){
+                problemas.push(`"${f.name}" parece corrompido ou não é um PDF válido`);
+                continue;
+              }
+              throw e;
+            }
             // tem camada de texto? (>=20 caracteres = digital)
             let chars=0;
             for(let p=1; p<=doc.numPages && chars<20; p++){
@@ -409,6 +428,7 @@
       }finally{
         if(worker) await worker.terminate();
       }
+      if(problemas.length) flashErro(problemas.join(' · ')+'.');
       return out;
     }
 
@@ -434,12 +454,25 @@
       }catch(e){
         console.error(e);   // sem OCR local: segue com os PDFs originais
       }
+      if(!enviaveis.length){
+        pararProgresso(); btn.disabled=false;
+        flashErro('Nenhum arquivo aproveitável para converter.');
+        return;
+      }
       iniciarProgresso();
       const fd=new FormData(); enviaveis.forEach(f=>fd.append('arquivos',f));
       try{
         const resp=await fetch('/converter',{method:'POST',body:fd});
-        const data=await resp.json();
-        if(!resp.ok) throw new Error(data.erro||'Falha na conversão.');
+        // o corpo pode não ser JSON (ex.: página de erro 413/504 do provedor)
+        let data=null; try{ data=await resp.json(); }catch(_){ data=null; }
+        if(!resp.ok){
+          const msg = (data&&data.erro) ||
+            (resp.status===413 ? 'Os arquivos são grandes demais para enviar de uma vez. Tente menos arquivos por conversão.' :
+             resp.status===429 ? 'Muitas conversões em pouco tempo. Aguarde um minuto.' :
+             `Falha no servidor (HTTP ${resp.status}). Tente novamente.`);
+          throw new Error(msg);
+        }
+        if(!data) throw new Error('Resposta inválida do servidor. Tente novamente.');
         const blob=b64ToBlob(data.arquivo_b64);
         ultimoExcel={blob, nome:data.nome};
         baixar(blob, data.nome);

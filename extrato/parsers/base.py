@@ -10,6 +10,7 @@ de extrato de conta corrente:
 from __future__ import annotations
 
 import re
+from datetime import date
 from typing import Optional
 
 # Reexporta o toolkit para os parsers (compatibilidade: `from .base import ...`)
@@ -70,4 +71,8 @@ def parse_generico(caminho: str, banco: str, tipo: str = CONTA_CORRENTE) -> Extr
                 banco=banco,
             )
         )
+    # Muitos extratos vêm do mais recente ao mais antigo; a auditoria de
+    # saldos parciais pressupõe ordem cronológica crescente. Sort estável:
+    # empates de data preservam a ordem do PDF.
+    transacoes.sort(key=lambda t: t.data or date.min)
     return Extrato(banco=banco, tipo_documento=tipo, transacoes=transacoes)

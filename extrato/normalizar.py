@@ -175,12 +175,16 @@ def parse_valor(texto: str) -> Optional[float]:
 
 # Token monetário brasileiro ESTRITO: exige centavos (,dd). Assim números de
 # documento, agências e CNPJ (inteiros sem vírgula) nunca são confundidos com
-# valores. O sinal de débito pode vir COLADO antes ("-166,40", padrão Bradesco)
-# ou depois dos centavos ("5,93-", padrão Santander). Um "- " com espaço (coluna
-# de documento vazia, ex. Santander) NÃO conta como sinal — por isso o '-' líder
-# só vale quando encostado no número.
+# valores. O sinal de débito pode vir COLADO antes ("-166,40", padrão Bradesco),
+# depois dos centavos ("5,93-", padrão Santander) ou ENVOLVENDO o número em
+# parênteses ("(1.234,56)", convenção contábil). Um "- " com espaço (coluna de
+# documento vazia, ex. Santander) NÃO conta como sinal — por isso o '-' líder
+# só vale quando encostado no número. O "(-)" solto do BB não casa os
+# parênteses (eles não envolvem o número) e segue tratado pelo parser do BB.
 _BRL_RE = re.compile(
-    r"(?<![\d.,\-])(-)?(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})(-)?"
+    r"(?<![\d.,\-])(?:(\()\s*)?(-)?"
+    r"(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})"
+    r"(-)?(?:\s*(\)))?"
 )
 
 
@@ -188,19 +192,20 @@ def valores_brl(texto: str) -> list[tuple[float, bool, int, int]]:
     """Extrai valores monetários em reais de uma linha.
 
     Retorna tuplas (valor_absoluto, negativo, inicio, fim) na ordem em que
-    aparecem. `negativo` é True quando há '-' colado antes ou depois do número.
-    `inicio` aponta para o início do número (sem o sinal líder), preservando o
-    comportamento de fatiar a descrição.
+    aparecem. `negativo` é True quando há '-' colado antes/depois do número ou
+    quando ele está entre parênteses. `inicio` aponta para o início do número
+    (sem sinal/parêntese líder), preservando o fatiamento da descrição.
     """
     out: list[tuple[float, bool, int, int]] = []
     for m in _BRL_RE.finditer(texto):
-        num = m.group(2).replace(".", "").replace(",", ".")
+        num = m.group(3).replace(".", "").replace(",", ".")
         try:
             valor = float(num)
         except ValueError:
             continue
-        neg = (m.group(1) == "-") or (m.group(3) == "-")
-        out.append((valor, neg, m.start(2), m.end()))
+        entre_parens = m.group(1) == "(" and m.group(5) == ")"
+        neg = (m.group(2) == "-") or (m.group(4) == "-") or entre_parens
+        out.append((valor, neg, m.start(3), m.end()))
     return out
 
 

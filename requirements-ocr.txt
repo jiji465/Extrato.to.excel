@@ -1,5 +1,5 @@
-# OCR para PDFs escaneados (ex.: Caixa) + testes.
-# Instalado localmente (iniciar.bat) e no Render. NÃO usar no Vercel.
+# OCR para PDFs escaneados (ex.: Caixa) — servidor local e Render.
+# NÃO usar no Vercel (excede o limite serverless; lá o OCR roda no navegador).
 -r requirements.txt
 
 pymupdf>=1.24.0
@@ -8,4 +8,4 @@ opencv-python-headless>=4.9.0
 numpy>=1.26.0
 pillow>=10.0.0
 
-pytest>=8.0.0        # apenas para rodar os testes
+# Para rodar os testes, instale à parte: pip install -r requirements-dev.txt

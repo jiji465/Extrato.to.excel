@@ -1,0 +1,4 @@
+# Dependências de DESENVOLVIMENTO (testes). Não instalar em produção.
+-r requirements-ocr.txt
+
+pytest>=8.0.0

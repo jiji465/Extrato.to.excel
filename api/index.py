@@ -1,8 +1,9 @@
 """Ponto de entrada para o Vercel (Python serverless).
 
 O Vercel serve o objeto WSGI `app`. Todas as rotas são reescritas para cá pelo
-vercel.json. OCR não está disponível nesta versão (PDFs escaneados mostram aviso);
-para OCR online, use o Render.
+vercel.json. PDFs escaneados funcionam: o OCR roda no NAVEGADOR do usuário
+(pdf.js + tesseract.js em static/vendor/) e o texto reconhecido sobe como
+"<nome>.pdf.txt", processado pelo mesmo pipeline e auditoria.
 """
 
 import os

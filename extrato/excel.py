@@ -109,9 +109,12 @@ _COLS_CONF = ["Arquivo", "Banco", "Saldo inicial", "Entradas", "Saídas",
               "Débitos (extrato)", "Confere débitos", "Saldos linha a linha"]
 
 
-def _aba_conferencia(wb: Workbook, relatorio: list) -> None:
+def _aba_conferencia(wb: Workbook, relatorio: list, ult_tx: int) -> None:
     ws = wb.create_sheet("Conferência")
     _escrever_cabecalho(ws, _COLS_CONF)
+
+    # intervalos REAIS da aba Transações (coluna inteira deixa o recálculo lento)
+    fF, fK, fL = (f"{_TX}!{c}2:{c}{ult_tx}" for c in ("F", "K", "L"))
 
     r = 1
     for res in relatorio:
@@ -124,14 +127,16 @@ def _aba_conferencia(wb: Workbook, relatorio: list) -> None:
         ws.cell(row=r, column=3, value=res.saldo_inicial)      # C Saldo inicial
         # D Entradas / E Saídas por arquivo (SUMIFS pela coluna Arquivo=K)
         ws.cell(row=r, column=4, value=(
-            f'=SUMIFS({_TX}!F:F,{_TX}!K:K,$A{r},{_TX}!F:F,">0")'))
+            f'=SUMIFS({fF},{fK},$A{r},{fF},">0")'))
         ws.cell(row=r, column=5, value=(
-            f'=SUMIFS({_TX}!F:F,{_TX}!K:K,$A{r},{_TX}!F:F,"<0")'))
+            f'=SUMIFS({fF},{fK},$A{r},{fF},"<0")'))
         ws.cell(row=r, column=6, value=f'=D{r}+E{r}')          # F Líquido
         ws.cell(row=r, column=7, value=f'=C{r}+F{r}')          # G Saldo final calc
         ws.cell(row=r, column=8, value=res.saldo_final)        # H Saldo final extrato
-        ws.cell(row=r, column=9, value=(                       # I Confere saldo
-            f'=IF(H{r}="","sem referência",'
+        # I Confere saldo — sem saldo inicial (C) ou final (H) não há o que
+        # conferir; sem o OR(C="") um C vazio viraria 0 e acusaria divergência
+        ws.cell(row=r, column=9, value=(
+            f'=IF(OR($C{r}="",H{r}=""),"sem referência",'
             f'IF(ABS(G{r}-H{r})<=0.01,"CONFERE","NÃO CONFERE"))'))
         ws.cell(row=r, column=10, value=res.total_creditos)    # J Créditos extrato
         ws.cell(row=r, column=11, value=(                      # K Confere créditos
@@ -140,8 +145,8 @@ def _aba_conferencia(wb: Workbook, relatorio: list) -> None:
         ws.cell(row=r, column=13, value=(                      # M Confere débitos
             f'=IF(L{r}="","—",IF(ABS(-E{r}-L{r})<=0.01,"CONFERE","NÃO CONFERE"))'))
         ws.cell(row=r, column=14, value=(                      # N Saldos linha a linha
-            f'=IF(COUNTIFS({_TX}!K:K,$A{r},{_TX}!L:L,"DIVERGE")=0,"CONFERE",'
-            f'"VER "&COUNTIFS({_TX}!K:K,$A{r},{_TX}!L:L,"DIVERGE")&" linha(s)")'))
+            f'=IF(COUNTIFS({fK},$A{r},{fL},"DIVERGE")=0,"CONFERE",'
+            f'"VER "&COUNTIFS({fK},$A{r},{fL},"DIVERGE")&" linha(s)")'))
 
         for col in (3, 4, 5, 6, 7, 8, 10, 12):
             ws.cell(row=r, column=col).number_format = _MOEDA
@@ -169,18 +174,19 @@ def _aba_conferencia(wb: Workbook, relatorio: list) -> None:
 # ---------------------------------------------------------------------------
 # Aba Categorias (fórmulas)
 # ---------------------------------------------------------------------------
-def _aba_categorias(wb: Workbook, transacoes: list[Transacao]) -> None:
+def _aba_categorias(wb: Workbook, transacoes: list[Transacao], ult_tx: int) -> None:
     ws = wb.create_sheet("Categorias")
     _escrever_cabecalho(ws, ["Categoria", "Entradas", "Saídas", "Total", "Nº lançamentos"])
+    fF, fH = (f"{_TX}!{c}2:{c}{ult_tx}" for c in ("F", "H"))
 
     cats = sorted({(t.categoria or "Não classificado") for t in transacoes})
     for i, cat in enumerate(cats):
         r = i + 2
         ws.cell(row=r, column=1, value=cat)
-        ws.cell(row=r, column=2, value=f'=SUMIFS({_TX}!F:F,{_TX}!H:H,$A{r},{_TX}!F:F,">0")')
-        ws.cell(row=r, column=3, value=f'=SUMIFS({_TX}!F:F,{_TX}!H:H,$A{r},{_TX}!F:F,"<0")')
+        ws.cell(row=r, column=2, value=f'=SUMIFS({fF},{fH},$A{r},{fF},">0")')
+        ws.cell(row=r, column=3, value=f'=SUMIFS({fF},{fH},$A{r},{fF},"<0")')
         ws.cell(row=r, column=4, value=f'=B{r}+C{r}')
-        ws.cell(row=r, column=5, value=f'=COUNTIFS({_TX}!H:H,$A{r})')
+        ws.cell(row=r, column=5, value=f'=COUNTIFS({fH},$A{r})')
         for col in (2, 3, 4):
             ws.cell(row=r, column=col).number_format = _MOEDA
         for col in range(1, 6):
@@ -194,18 +200,19 @@ def _aba_categorias(wb: Workbook, transacoes: list[Transacao]) -> None:
 # ---------------------------------------------------------------------------
 # Aba Resumo por banco (fórmulas)
 # ---------------------------------------------------------------------------
-def _aba_resumo(wb: Workbook, transacoes: list[Transacao]) -> None:
+def _aba_resumo(wb: Workbook, transacoes: list[Transacao], ult_tx: int) -> None:
     ws = wb.create_sheet("Resumo")
     _escrever_cabecalho(ws, ["Banco", "Entradas", "Saídas", "Saldo do período", "Nº lançamentos"])
+    fF, fJ = (f"{_TX}!{c}2:{c}{ult_tx}" for c in ("F", "J"))
 
     bancos = sorted({t.banco for t in transacoes})
     for i, banco in enumerate(bancos):
         r = i + 2
         ws.cell(row=r, column=1, value=banco)
-        ws.cell(row=r, column=2, value=f'=SUMIFS({_TX}!F:F,{_TX}!J:J,$A{r},{_TX}!F:F,">0")')
-        ws.cell(row=r, column=3, value=f'=SUMIFS({_TX}!F:F,{_TX}!J:J,$A{r},{_TX}!F:F,"<0")')
+        ws.cell(row=r, column=2, value=f'=SUMIFS({fF},{fJ},$A{r},{fF},">0")')
+        ws.cell(row=r, column=3, value=f'=SUMIFS({fF},{fJ},$A{r},{fF},"<0")')
         ws.cell(row=r, column=4, value=f'=B{r}+C{r}')
-        ws.cell(row=r, column=5, value=f'=COUNTIFS({_TX}!J:J,$A{r})')
+        ws.cell(row=r, column=5, value=f'=COUNTIFS({fJ},$A{r})')
         for col in (2, 3, 4):
             ws.cell(row=r, column=col).number_format = _MOEDA
         for col in range(1, 6):
@@ -258,10 +265,11 @@ def gerar_excel(transacoes: Iterable[Transacao], relatorio: list | None = None) 
     transacoes = list(transacoes)
     wb = Workbook()
     _aba_transacoes(wb, transacoes)
+    ult_tx = max(2, len(transacoes) + 1)   # última linha da aba Transações
     if relatorio:
-        _aba_conferencia(wb, relatorio)
-    _aba_resumo(wb, transacoes)
-    _aba_categorias(wb, transacoes)
+        _aba_conferencia(wb, relatorio, ult_tx)
+    _aba_resumo(wb, transacoes, ult_tx)
+    _aba_categorias(wb, transacoes, ult_tx)
     if relatorio:
         _aba_auditoria(wb, relatorio)
 

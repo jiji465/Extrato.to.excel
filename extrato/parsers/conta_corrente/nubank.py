@@ -79,12 +79,14 @@ def parse(caminho: str) -> Extrato:
     corte = next((i for i, l in enumerate(linhas)
                   if l.strip().startswith("Movimentações")), 0)
     cab = linhas[:corte] if corte else linhas
+    # total de saídas: manter 0,00 como 0,00 (auditável); só None quando ausente
+    saidas = _valor_label(cab, "Total de saídas")
     extrato = Extrato(
         banco=BANCO,
         tipo_documento=CONTA_CORRENTE,
         saldo_inicial=_valor_label(cab, "Saldo inicial"),
         total_creditos=_valor_label(cab, "Total de entradas"),
-        total_debitos=abs(_valor_label(cab, "Total de saídas") or 0) or None,
+        total_debitos=abs(saidas) if saidas is not None else None,
         rendimento=_valor_label(cab, "Rendimento líquido"),
     )
     # saldo final: última ocorrência de "Saldo final do período" com valor

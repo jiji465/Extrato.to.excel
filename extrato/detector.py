@@ -24,8 +24,12 @@ _ASSINATURAS = [
     ("banco_do_brasil", "Banco do Brasil",
      [r"banco do brasil", r"00\.000\.000/0001-91", r"bb rende", r"rende f[aá]cil",
       r"dia lote documento hist[oó]rico", r"capital giro peac"]),
+    # "\bcaixa\b" sozinho casaria "caixa eletrônico"/"fluxo de caixa" de outros
+    # bancos; usamos assinaturas específicas ("extrato por período" é o título
+    # do layout da Caixa, presente inclusive no texto vindo do OCR).
     ("caixa", "Caixa Econômica Federal",
-     [r"caixa econ[oô]mica", r"\bcaixa\b", r"00\.360\.305/0001-04"]),
+     [r"caixa econ[oô]mica", r"00\.360\.305/0001-04",
+      r"extrato por per[ií]odo", r"caixa\s*tem", r"\bcef\b"]),
 ]
 
 # Sinais de cada tipo de documento (pontuação por palavra-chave encontrada).
@@ -82,7 +86,10 @@ def detectar_tipo(texto: str) -> str:
     if fortes_fatura:
         placar[FATURA] += 3
 
-    melhor = max(placar, key=lambda k: placar[k])
+    # Desempate EXPLÍCITO a favor de conta corrente (caso mais comum): o max
+    # sobre o dict venceria pela ordem de inserção (fatura), não pela intenção.
+    ordem = [CONTA_CORRENTE, FATURA, INVESTIMENTO]
+    melhor = max(ordem, key=lambda k: placar[k])
     return melhor if placar[melhor] > 0 else CONTA_CORRENTE
 
 

@@ -15,11 +15,14 @@
 
 | Plataforma | PDFs digitais | PDF escaneado (OCR) | Dificuldade |
 |-----------|:---:|:---:|---|
-| **Vercel** | ✅ | ❌ (limite de tamanho/tempo) | Fácil |
-| **Render** | ✅ | ✅ | Fácil |
+| **Vercel** | ✅ | ✅ (OCR **no navegador** do usuário) | Fácil |
+| **Render** | ✅ | ✅ (OCR no servidor) | Fácil |
 
-Se você precisa ler **PDF escaneado (Caixa)** online, use **Render**. Se só usa
-os bancos digitais online (e escaneado só no app local), o **Vercel** serve.
+O **Vercel** cobre tudo: PDFs escaneados (Caixa) são reconhecidos pelo próprio
+navegador de quem envia (pdf.js + tesseract.js embutidos no site) e só o texto
+vai ao servidor. Limitação do Vercel: PDFs **digitais** muito grandes (> ~4,5 MB
+por envio) podem esbarrar no limite de payload do serverless — nesse caso envie
+menos arquivos por vez, ou use o Render/app local.
 
 ---
 
@@ -48,14 +51,16 @@ Repositório: https://github.com/jiji465/Extrato.to.excel
    `api/index.py` já estão prontos). Clique **Deploy**.
 4. Em ~1 min você recebe uma URL pública `https://....vercel.app`.
 
-**Opcional — proteger com senha:** Project → **Settings → Environment
+**Proteger com senha (recomendado):** Project → **Settings → Environment
 Variables** → adicione:
 - `EXTRATO_SENHA` = a senha da equipe
-- `EXTRATO_SECRET` = qualquer texto aleatório longo (mantém o login estável)
+- `EXTRATO_SECRET` = qualquer texto aleatório longo (recomendado; sem ele a
+  chave de sessão é derivada da própria senha)
 
 Depois, **Redeploy**. Sem `EXTRATO_SENHA`, o site fica **público**.
 
-> No Vercel, PDFs escaneados mostram um aviso de "OCR indisponível online".
+> PDFs escaneados funcionam no Vercel: o OCR roda **no navegador** de quem
+> envia (a 1ª conversão baixa ~8 MB de bibliotecas, depois fica em cache).
 
 ---
 

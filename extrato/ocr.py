@@ -56,10 +56,10 @@ def _ocr(caminho: str, dpi: int) -> list[str]:
         from rapidocr_onnxruntime import RapidOCR
     except ImportError as exc:  # pragma: no cover
         raise OCRIndisponivel(
-            "PDF escaneado: o reconhecimento (OCR) roda no seu NAVEGADOR nesta "
-            "versão, mas não foi executado para este arquivo. Recarregue a "
-            "página (Ctrl+F5) e tente novamente; se persistir, use o "
-            "aplicativo local."
+            "PDF escaneado: o OCR do servidor não está instalado nesta "
+            "instalação. No site, o próprio navegador faz o OCR — recarregue "
+            "a página (Ctrl+F5) e envie de novo. Rodando localmente, instale "
+            "as dependências: pip install -r requirements-ocr.txt"
         ) from exc
 
     engine = RapidOCR()

@@ -17,6 +17,7 @@ Segurança:
 from __future__ import annotations
 
 import base64
+import hashlib
 import hmac
 import os
 import tempfile
@@ -42,11 +43,18 @@ app.config.update(
     SESSION_COOKIE_SECURE=True,   # cookie de sessão só por HTTPS
 )
 
-# Chave de sessão: defina EXTRATO_SECRET em produção (fixa entre reinícios/workers).
-app.secret_key = os.environ.get("EXTRATO_SECRET") or os.urandom(32)
-
 # Senha de acesso da equipe. Vazia => acesso público (sem login).
 _SENHA = os.environ.get("EXTRATO_SENHA", "")
+
+# Chave de sessão: defina EXTRATO_SECRET em produção (fixa entre reinícios/
+# workers). Sem ela, mas COM senha, derivamos uma chave estável da própria
+# senha — senão, em serverless (Vercel) cada cold start invalidaria a sessão
+# e o login entraria em loop. Sem senha não há sessão que importe: aleatória.
+app.secret_key = (
+    os.environ.get("EXTRATO_SECRET")
+    or (hashlib.sha256(f"extrato-sessao:{_SENHA}".encode()).digest() if _SENHA
+        else os.urandom(32))
+)
 
 # Limites contra abuso.
 MAX_ARQUIVOS = 30          # arquivos por requisição
@@ -132,6 +140,13 @@ def login_required(view):
     return wrapper
 
 
+@app.errorhandler(413)
+def _muito_grande(_e):
+    mb = app.config["MAX_CONTENT_LENGTH"] // (1024 * 1024)
+    return jsonify({"erro": f"Os arquivos somam mais de {mb} MB. "
+                            "Envie menos arquivos por conversão."}), 413
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     erro = ""
@@ -142,7 +157,11 @@ def login():
                     "(defina EXTRATO_SENHA).")
         elif hmac.compare_digest(senha, _SENHA):
             session["auth"] = True
-            destino = request.args.get("next") or url_for("index")
+            # só caminhos internos ("/x"); "//host" ou URL absoluta seria
+            # open redirect para site externo
+            destino = request.args.get("next") or ""
+            if not destino.startswith("/") or destino.startswith("//"):
+                destino = url_for("index")
             return redirect(destino)
         else:
             erro = "Senha incorreta."
@@ -181,7 +200,7 @@ def rota_converter():
     temporarios: list[tuple[str, str]] = []
     try:
         for f in enviados:
-            low = f.filename.lower()
+            low = (f.filename or "").lower()
             if low.endswith(".pdf"):
                 sufixo, nome_exib = ".pdf", f.filename
             elif low.endswith(".pdf.txt"):
@@ -250,4 +269,6 @@ def rota_converter():
 
 
 if __name__ == "__main__":
+    # execução local é http => o cookie de sessão não pode exigir HTTPS
+    app.config["SESSION_COOKIE_SECURE"] = False
     app.run(host="127.0.0.1", port=5000, debug=False)
